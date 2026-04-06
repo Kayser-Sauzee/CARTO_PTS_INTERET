@@ -1,3 +1,7 @@
+Voici le code complet avec les corrections pour le long clic sur mobile, incluant la gestion améliorée des événements tactiles et un délai de 1000 ms pour une meilleure détection :
+
+
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -377,13 +381,15 @@ fetch(API_URL)
 /* ══ LONG CLIC → FORMULAIRE ═══════════════════════════ */
 const ring = document.getElementById('longpress-ring');
 let pressTimer = null;
+let isLongPressActive = false;
 
 function startPress(cx, cy, latlng) {
   ring.style.left = cx + 'px';
-  ring.style.top = cy + 'px';
+  ring.style.top  = cy + 'px';
   ring.classList.add('active');
 
   pressTimer = setTimeout(async () => {
+    isLongPressActive = true;
     ring.classList.remove('active');
 
     try {
@@ -395,7 +401,12 @@ function startPress(cx, cy, latlng) {
 
       // Copier l'adresse dans le presse-papiers
       if (data.display_name) {
-        await navigator.clipboard.writeText(data.display_name);
+        try {
+          await navigator.clipboard.writeText(data.display_name);
+          console.log("Adresse copiée :", data.display_name);
+        } catch (clipboardError) {
+          console.error("Erreur lors de la copie dans le presse-papiers :", clipboardError);
+        }
       }
 
       // Ouvrir le Google Form dans un nouvel onglet
@@ -403,22 +414,33 @@ function startPress(cx, cy, latlng) {
     } catch (error) {
       console.error("Erreur lors de la récupération de l'adresse :", error);
     }
-  }, 800); // Temps de maintien pour un long clic (800 ms)
-}
-function cancelPress() {
-  clearTimeout(pressTimer);
-  ring.classList.remove('active');
+  }, 1000); // Délai de 1000 ms pour un long clic plus fiable
 }
 
-map.on('mousedown',  e => startPress(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng));
-map.on('mouseup',    cancelPress);
-map.on('mousemove',  cancelPress);
+function cancelPress() {
+  if (!isLongPressActive) {
+    clearTimeout(pressTimer);
+    ring.classList.remove('active');
+  }
+  isLongPressActive = false;
+}
+
+map.on('mousedown', e => startPress(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng));
+map.on('mouseup', cancelPress);
+map.on('mousemove', cancelPress);
+
 map.on('touchstart', e => {
   const t = e.originalEvent.touches[0];
   startPress(t.clientX, t.clientY, e.latlng);
 });
-map.on('touchend',  cancelPress);
-map.on('touchmove', cancelPress);
+
+map.on('touchend', cancelPress);
+
+map.on('touchmove', e => {
+  if (!isLongPressActive) {
+    cancelPress();
+  }
+});
 </script>
 </body>
 </html>
