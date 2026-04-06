@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Carte Mobile</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css"/>
+
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, sans-serif; }
+#map { height: 100vh; }
+
+/* ── Spinner ── */
+#loader {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+#loader.hidden { display: none; }
+.spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #ddd;
+  border-top-color: #3266ad;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Bottom sheet ── */
+#panel {
+  position: fixed;
+  bottom: -380px;
+  left: 0;
+  width: 100%;
+  height: 380px;
+  background: white;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  box-shadow: 0 -3px 16px rgba(0,0,0,0.18);
+  padding: 12px 18px 20px;
+  transition: bottom 0.32s cubic-bezier(.4,0,.2,1);
+  overflow-y: auto;
+  z-index: 1000;
+}
+#panel.open { bottom: 0; }
+
+#handle {
+  width: 44px; height: 5px;
+  background: #ccc;
+  border-radius: 4px;
+  margin: 0 auto 14px;
+  cursor: grab;
+}
+
+#content h3 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  color: #222;
+}
+#content p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: #444;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+#content p .ic { flex-shrink: 0; }
+#content a { color: #3266ad; text-decoration: none; }
+#content a:hover { text-decoration: underline; }
+.empty-field { color: #aaa; font-style: italic; }
+
+/* ── Boutons flottants ── */
+.map-btn {
+  background: white;
+  padding: 10px 12px;
+  font-size: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer;
+  user-select: none;
+  line-height: 1;
+}
+
+/* ── Légende ── */
+#legend {
+  position: fixed;
+  bottom: 16px;
+  right: 12px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  padding: 10px 14px;
+  z-index: 999;
+  font-size: 12px;
+  max-height: 50vh;
+  overflow-y: auto;
+  transition: opacity 0.2s;
+}
+#legend.hidden { display: none; }
+#legend-toggle {
+  position: fixed;
+  bottom: 16px;
+  right: 12px;
+  z-index: 1000;
+  font-size: 18px;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 5px 0;
+  color: #333;
+}
+.legend-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+
+/* ── Feedback long clic ── */
+#longpress-ring {
+  position: fixed;
+  width: 50px; height: 50px;
+  border-radius: 50%;
+  border: 3px solid #3266ad;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.8s ease;
+  z-index: 2000;
+  opacity: 0.7;
+}
+#longpress-ring.active { transform: translate(-50%, -50%) scale(1); }
+</style>
+</head>
+
+<body>
+
+<div id="loader"><div class="spinner"></div></div>
+<div id="map"></div>
+
+<div id="panel">
+  <div id="handle"></div>
+  <div id="content"></div>
+</div>
+
+<div id="legend" class="hidden"></div>
+<div id="longpress-ring"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
+
+const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfEX_UE8x8YAh7RypfVLBaZdMAH_u85SIJFnJKfZ3tSc_bpxw/viewform";
+
+const colors = {
+  "Hôtel":          "#3266ad",
+  "CEREMA":         "#e03232",
+  "CEI":            "#2a9a4a",
+  "CER":            "#e07c20",
+  "Parking autre":  "#7e57c2",
+  "Restaurant":     "#795548",
+  "Autre":          "#757575"
+};
+
+// ── Carte ──────────────────────────────────────────────
+const map = L.map('map', { zoomControl: false }).setView([46.8, 2.5], 6);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap'
+}).addTo(map);
+
+// Zoom en haut à droite
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+const clusters = L.markerClusterGroup({ chunkedLoading: true });
+
+// ── Géolocalisation ────────────────────────────────────
+let userMarker;
+
+function setUserPos(latlng) {
+  if (!userMarker) {
+    userMarker = L.circleMarker(latlng, {
+      radius: 8,
+      color: '#fff',
+      fillColor: '#3266ad',
+      fillOpacity: 1,
+      weight: 2
+    }).addTo(map).bindPopup("Vous êtes ici");
+  } else {
+    userMarker.setLatLng(latlng);
+  }
+}
+
+navigator.geolocation.watchPosition(
+  pos => setUserPos([pos.coords.latitude, pos.coords.longitude]),
+  null,
+  { enableHighAccuracy: true }
+);
+
+// Bouton géoloc
+const locateCtrl = L.control({ position: 'topleft' });
+locateCtrl.onAdd = function() {
+  const div = L.DomUtil.create('div', 'map-btn');
+  div.innerHTML = "📍";
+  div.title = "Ma position";
+  L.DomEvent.on(div, 'click', function(e) {
+    L.DomEvent.stopPropagation(e);
+    navigator.geolocation.getCurrentPosition(pos => {
+      const latlng = [pos.coords.latitude, pos.coords.longitude];
+      setUserPos(latlng);
+      map.setView(latlng, 14);
+    });
+  });
+  return div;
+};
+locateCtrl.addTo(map);
+
+// ── Légende ────────────────────────────────────────────
+function buildLegend() {
+  const leg = document.getElementById('legend');
+  leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:6px;">Types</strong>';
+  for (const [label, color] of Object.entries(colors)) {
+    leg.innerHTML += `
+      <div class="legend-item">
+        <div class="legend-dot" style="background:${color};"></div>
+        ${label}
+      </div>`;
+  }
+}
+
+// Bouton légende (remplace l'élément fixe par un contrôle Leaflet)
+const legendCtrl = L.control({ position: 'bottomright' });
+legendCtrl.onAdd = function() {
+  const div = L.DomUtil.create('div', 'map-btn');
+  div.innerHTML = "🗺";
+  div.title = "Légende";
+  div.style.fontSize = "20px";
+  L.DomEvent.on(div, 'click', function(e) {
+    L.DomEvent.stopPropagation(e);
+    const leg = document.getElementById('legend');
+    leg.classList.toggle('hidden');
+  });
+  return div;
+};
+legendCtrl.addTo(map);
+buildLegend();
+
+// ── Panneau bas ────────────────────────────────────────
+const panel  = document.getElementById("panel");
+const content = document.getElementById("content");
+const handle  = document.getElementById("handle");
+
+function field(icon, value, link) {
+  if (!value || value.trim() === "" || value === "undefined") {
+    return `<p><span class="ic">${icon}</span><span class="empty-field">—</span></p>`;
+  }
+  const inner = link
+    ? `<a href="${link}" target="_blank">${value}</a>`
+    : value;
+  return `<p><span class="ic">${icon}</span>${inner}</p>`;
+}
+
+function openPanel(data) {
+  const type   = data["Type de point d'intérêt"] || "Point d'intérêt";
+  const adress = data["Adresse"] || "";
+  const contact = data["Contact(s)"] || "";
+  const phone  = data["Téléphone(s)"] || "";
+  const avis   = data["Avis"] || "";
+  const date   = data["Date de la dernière visite"] || "";
+  const comm   = data["Commentaires"] || "";
+
+  const mapsLink = adress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adress)}`
+    : null;
+  const telLink = phone ? `tel:${phone}` : null;
+
+  content.innerHTML = `
+    <h3>${type}</h3>
+    ${field("📍", adress, mapsLink)}
+    ${field("👤", contact)}
+    ${field("📞", phone, telLink)}
+    ${field("⭐", avis)}
+    ${field("📅", date)}
+    ${comm ? `<p><span class="ic">💬</span>${comm}</p>` : ""}
+  `;
+  panel.classList.add("open");
+}
+
+map.on('click', () => {
+  panel.classList.remove("open");
+  document.getElementById('legend').classList.add('hidden');
+});
+
+// Swipe down pour fermer
+let startY = 0;
+handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
+handle.addEventListener('touchmove', e => {
+  if (e.touches[0].clientY - startY > 50) panel.classList.remove("open");
+});
+
+// ── Chargement des données ─────────────────────────────
+function makeIcon(type) {
+  const color = colors[type] || colors["Autre"];
+  // BUG FIX : apostrophe dans type — on utilise une variable, pas inline dans le template HTML
+  return L.divIcon({
+    className: 'custom-icon',
+    html: `<div style="background:${color};width:20px;height:20px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.35);"></div>`,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+}
+
+fetch(API_URL)
+  .then(res => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  })
+  .then(data => {
+    data.forEach(item => {
+      const lat = parseFloat(item["Latitude"]);
+      const lon = parseFloat(item["Longitude"]);
+      if (isNaN(lat) || isNaN(lon)) return;
+
+      const type = item["Type de point d'intérêt"];
+      const marker = L.marker([lat, lon], { icon: makeIcon(type) });
+      marker.on('click', e => {
+        L.DomEvent.stopPropagation(e);
+        openPanel(item);
+      });
+      clusters.addLayer(marker);
+    });
+    map.addLayer(clusters);
+  })
+  .catch(err => {
+    console.error("Erreur chargement données :", err);
+    content.innerHTML = `<p style="color:red;">Impossible de charger les données.</p>`;
+    panel.classList.add("open");
+  })
+  .finally(() => {
+    document.getElementById('loader').classList.add('hidden');
+  });
+
+// ── Long clic → formulaire ─────────────────────────────
+const ring = document.getElementById('longpress-ring');
+let pressTimer;
+
+function startLongPress(x, y, latlng) {
+  ring.style.left = x + 'px';
+  ring.style.top  = y + 'px';
+  ring.classList.add('active');
+
+  pressTimer = setTimeout(async () => {
+    ring.classList.remove('active');
+    try {
+      const res  = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`
+      );
+      const data = await res.json();
+      const addr = data.display_name || "";
+
+      // Clipboard : silencieux si non disponible (HTTP)
+      try { await navigator.clipboard.writeText(addr); } catch (_) {}
+
+      window.open(FORM_URL, '_blank');
+    } catch(e) {
+      window.open(FORM_URL, '_blank');
+    }
+  }, 800);
+}
+
+function cancelLongPress() {
+  clearTimeout(pressTimer);
+  ring.classList.remove('active');
+}
+
+// Desktop
+map.on('mousedown', e => startLongPress(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng));
+map.on('mouseup',   cancelLongPress);
+map.on('mousemove', cancelLongPress);
+
+// Mobile
+map.on('touchstart', e => {
+  const t = e.originalEvent.touches[0];
+  startLongPress(t.clientX, t.clientY, e.latlng);
+});
+map.on('touchend',   cancelLongPress);
+map.on('touchmove',  cancelLongPress);
+
+</script>
+</body>
+</html>
