@@ -1,3 +1,7 @@
+Voici le code complet intégré avec les corrections pour les deux problèmes que tu as mentionnés :
+
+
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -209,20 +213,21 @@ const clusters = L.markerClusterGroup({ chunkedLoading: true });
    Complètement différent des ronds POI
 ═══════════════════════════════════════════════════ */
 const userIcon = L.divIcon({
-  className: '',
+  className: 'user-dot-wrapper',
   html: `<div class="user-dot-wrapper">
            <div class="user-pulse"></div>
            <div class="user-dot"></div>
          </div>`,
   iconSize:   [20, 20],
-  iconAnchor: [10, 10]
+  iconAnchor: [10, 10],
+  className: 'user-marker'
 });
 
 let userMarker = null;
 
 function setUserPos(latlng) {
   if (!userMarker) {
-    userMarker = L.marker(latlng, { icon: userIcon, zIndexOffset: 1000 })
+    userMarker = L.marker(latlng, { icon: userIcon, zIndexOffset: 2000 })
       .addTo(map)
       .bindPopup("📍 Vous êtes ici");
   } else {
@@ -254,7 +259,7 @@ locateCtrl.onAdd = function() {
 };
 locateCtrl.addTo(map);
 
-/* ══ LÉGENDE ══════════════════════════════════════════ */
+/* ══ LÉGENDE ════════════════════════════════════════════ */
 const legendCtrl = L.control({ position: 'bottomright' });
 legendCtrl.onAdd = function() {
   const wrap = L.DomUtil.create('div');
@@ -282,7 +287,7 @@ legendCtrl.onAdd = function() {
 };
 legendCtrl.addTo(map);
 
-/* ══ PANNEAU BAS ══════════════════════════════════════ */
+/* ══ PANNEAU BAS ════════════════════════════════════════════ */
 const panel   = document.getElementById("panel");
 const content = document.getElementById("content");
 const handle  = document.getElementById("handle");
@@ -329,18 +334,18 @@ handle.addEventListener('touchmove',  e => {
   if (e.touches[0].clientY - swipeY > 60) panel.classList.remove("open");
 }, { passive: true });
 
-/* ══ ICÔNES POI ═══════════════════════════════════════ */
+/* ══ ICÔNES POI ════════════════════════════════════════════ */
 function makePOIIcon(type) {
   const color = COLORS[type] || COLORS["Autre"];
   return L.divIcon({
-    className: '',
+    className: 'poi-marker',
     html: `<div style="background:${color};width:22px;height:22px;border-radius:50%;border:3px solid white;box-shadow:0 1px 5px rgba(0,0,0,0.4);"></div>`,
     iconSize:   [22, 22],
     iconAnchor: [11, 11]
   });
 }
 
-/* ══ DONNÉES ══════════════════════════════════════════ */
+/* ══ DONNÉES ════════════════════════════════════════════ */
 fetch(API_URL)
   .then(res => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -353,18 +358,12 @@ fetch(API_URL)
       if (isNaN(lat) || isNaN(lon)) return;
 
       const type   = item["Type de point d'intérêt"] || "Autre";
-      const marker = L.marker([lat, lon], { icon: makePOIIcon(type) });
-
-      /*
-       * FIX CLIC : on écoute l'événement Leaflet 'click' sur le marker.
-       * stopPropagation empêche l'event de remonter à la carte
-       * (ce qui fermerait aussitôt le panneau).
-       * On ne bloque PAS le clic avant openPanel.
-       */
-      marker.on('click', function(e) {
-        L.DomEvent.stopPropagation(e);
-        openPanel(item);
-      });
+      const marker = L.marker([lat, lon], { icon: makePOIIcon(type) })
+        .bindPopup(`<b>${type}</b><br>${item["Adresse"] || ""}`)
+        .on('click', function(e) {
+          L.DomEvent.stopPropagation(e);
+          openPanel(item);
+        });
 
       clusters.addLayer(marker);
     });
@@ -414,3 +413,4 @@ map.on('touchmove', cancelPress);
 </script>
 </body>
 </html>
+
