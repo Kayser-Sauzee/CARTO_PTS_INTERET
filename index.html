@@ -380,17 +380,30 @@ let pressTimer = null;
 
 function startPress(cx, cy, latlng) {
   ring.style.left = cx + 'px';
-  ring.style.top  = cy + 'px';
+  ring.style.top = cy + 'px';
   ring.classList.add('active');
+
   pressTimer = setTimeout(async () => {
     ring.classList.remove('active');
+
     try {
-      const r    = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`);
-      const data = await r.json();
-      try { await navigator.clipboard.writeText(data.display_name || ""); } catch(_) {}
-    } catch(_) {}
-    window.open(FORM_URL, '_blank');
-  }, 800);
+      // Récupérer l'adresse à partir des coordonnées
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`
+      );
+      const data = await response.json();
+
+      // Copier l'adresse dans le presse-papiers
+      if (data.display_name) {
+        await navigator.clipboard.writeText(data.display_name);
+      }
+
+      // Ouvrir le Google Form dans un nouvel onglet
+      window.open(FORM_URL, '_blank');
+    } catch (error) {
+      console.error("Erreur lors de la récupération de l'adresse :", error);
+    }
+  }, 800); // Temps de maintien pour un long clic (800 ms)
 }
 function cancelPress() {
   clearTimeout(pressTimer);
