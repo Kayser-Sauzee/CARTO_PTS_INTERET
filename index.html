@@ -18,7 +18,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
 #loader {
   position: fixed;
   inset: 0;
-  background: rgba(255,255,255,0.75);
+  background: rgba(255,255,255,0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -34,18 +34,45 @@ body { margin: 0; font-family: Arial, sans-serif; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Marqueur utilisateur pulsant ── */
+.user-dot-wrapper {
+  position: relative;
+  width: 20px; height: 20px;
+}
+.user-dot {
+  position: absolute;
+  inset: 0;
+  background: #3266ad;
+  border-radius: 50%;
+  border: 3px solid white;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+  z-index: 2;
+}
+.user-pulse {
+  position: absolute;
+  inset: -7px;
+  background: rgba(50,102,173,0.25);
+  border-radius: 50%;
+  animation: pulse 2s ease-out infinite;
+  z-index: 1;
+}
+@keyframes pulse {
+  0%   { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
 /* ── Bottom sheet ── */
 #panel {
   position: fixed;
-  bottom: -380px;
+  bottom: -440px;
   left: 0;
   width: 100%;
-  height: 380px;
+  height: 440px;
   background: white;
   border-top-left-radius: 18px;
   border-top-right-radius: 18px;
   box-shadow: 0 -3px 16px rgba(0,0,0,0.18);
-  padding: 12px 18px 20px;
+  padding: 12px 18px 28px;
   transition: bottom 0.32s cubic-bezier(.4,0,.2,1);
   overflow-y: auto;
   z-index: 1000;
@@ -61,24 +88,32 @@ body { margin: 0; font-family: Arial, sans-serif; }
 }
 
 #content h3 {
-  margin: 0 0 12px;
+  margin: 0 0 6px;
   font-size: 17px;
-  color: #222;
+  color: #111;
+}
+.type-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 14px;
 }
 #content p {
-  margin: 6px 0;
+  margin: 7px 0;
   font-size: 14px;
   color: #444;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
+  gap: 8px;
+  line-height: 1.5;
 }
-#content p .ic { flex-shrink: 0; }
 #content a { color: #3266ad; text-decoration: none; }
 #content a:hover { text-decoration: underline; }
-.empty-field { color: #aaa; font-style: italic; }
 
-/* ── Boutons flottants ── */
+/* ── Boutons carte ── */
 .map-btn {
   background: white;
   padding: 10px 12px;
@@ -92,31 +127,20 @@ body { margin: 0; font-family: Arial, sans-serif; }
 
 /* ── Légende ── */
 #legend {
-  position: fixed;
-  bottom: 16px;
-  right: 12px;
   background: white;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
   padding: 10px 14px;
-  z-index: 999;
   font-size: 12px;
-  max-height: 50vh;
-  overflow-y: auto;
-  transition: opacity 0.2s;
+  display: none;
+  min-width: 160px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  margin-bottom: 6px;
 }
-#legend.hidden { display: none; }
-#legend-toggle {
-  position: fixed;
-  bottom: 16px;
-  right: 12px;
-  z-index: 1000;
-  font-size: 18px;
-}
+#legend.visible { display: block; }
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   margin: 5px 0;
   color: #333;
 }
@@ -124,14 +148,14 @@ body { margin: 0; font-family: Arial, sans-serif; }
   width: 14px; height: 14px;
   border-radius: 50%;
   border: 2px solid white;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
   flex-shrink: 0;
 }
 
 /* ── Feedback long clic ── */
 #longpress-ring {
   position: fixed;
-  width: 50px; height: 50px;
+  width: 54px; height: 54px;
   border-radius: 50%;
   border: 3px solid #3266ad;
   pointer-events: none;
@@ -145,60 +169,62 @@ body { margin: 0; font-family: Arial, sans-serif; }
 </head>
 
 <body>
-
 <div id="loader"><div class="spinner"></div></div>
 <div id="map"></div>
-
 <div id="panel">
   <div id="handle"></div>
   <div id="content"></div>
 </div>
-
-<div id="legend" class="hidden"></div>
 <div id="longpress-ring"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
-
+/* ══ CONFIG ════════════════════════════════════════════ */
+const API_URL  = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfEX_UE8x8YAh7RypfVLBaZdMAH_u85SIJFnJKfZ3tSc_bpxw/viewform";
 
-const colors = {
-  "Hôtel":          "#3266ad",
-  "CEREMA":         "#e03232",
-  "CEI":            "#2a9a4a",
-  "CER":            "#e07c20",
-  "Parking autre":  "#7e57c2",
-  "Restaurant":     "#795548",
-  "Autre":          "#757575"
+const COLORS = {
+  "Hôtel":         "#3266ad",
+  "CEREMA":        "#e03232",
+  "CEI":           "#2a9a4a",
+  "CER":           "#e07c20",
+  "Parking autre": "#7e57c2",
+  "Restaurant":    "#795548",
+  "Autre":         "#757575"
 };
 
-// ── Carte ──────────────────────────────────────────────
+/* ══ CARTE ════════════════════════════════════════════ */
 const map = L.map('map', { zoomControl: false }).setView([46.8, 2.5], 6);
-
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap'
 }).addTo(map);
-
-// Zoom en haut à droite
 L.control.zoom({ position: 'topright' }).addTo(map);
 
 const clusters = L.markerClusterGroup({ chunkedLoading: true });
 
-// ── Géolocalisation ────────────────────────────────────
-let userMarker;
+/* ══ MARQUEUR UTILISATEUR ════════════════════════════
+   Icône CSS distincte — point bleu avec halo pulsant
+   Complètement différent des ronds POI
+═══════════════════════════════════════════════════ */
+const userIcon = L.divIcon({
+  className: '',
+  html: `<div class="user-dot-wrapper">
+           <div class="user-pulse"></div>
+           <div class="user-dot"></div>
+         </div>`,
+  iconSize:   [20, 20],
+  iconAnchor: [10, 10]
+});
+
+let userMarker = null;
 
 function setUserPos(latlng) {
   if (!userMarker) {
-    userMarker = L.circleMarker(latlng, {
-      radius: 8,
-      color: '#fff',
-      fillColor: '#3266ad',
-      fillOpacity: 1,
-      weight: 2
-    }).addTo(map).bindPopup("Vous êtes ici");
+    userMarker = L.marker(latlng, { icon: userIcon, zIndexOffset: 1000 })
+      .addTo(map)
+      .bindPopup("📍 Vous êtes ici");
   } else {
     userMarker.setLatLng(latlng);
   }
@@ -210,119 +236,111 @@ navigator.geolocation.watchPosition(
   { enableHighAccuracy: true }
 );
 
-// Bouton géoloc
+/* Bouton centrer */
 const locateCtrl = L.control({ position: 'topleft' });
 locateCtrl.onAdd = function() {
   const div = L.DomUtil.create('div', 'map-btn');
   div.innerHTML = "📍";
   div.title = "Ma position";
-  L.DomEvent.on(div, 'click', function(e) {
-    L.DomEvent.stopPropagation(e);
+  L.DomEvent.disableClickPropagation(div);
+  div.addEventListener('click', () => {
     navigator.geolocation.getCurrentPosition(pos => {
-      const latlng = [pos.coords.latitude, pos.coords.longitude];
-      setUserPos(latlng);
-      map.setView(latlng, 14);
+      const ll = [pos.coords.latitude, pos.coords.longitude];
+      setUserPos(ll);
+      map.setView(ll, 14);
     });
   });
   return div;
 };
 locateCtrl.addTo(map);
 
-// ── Légende ────────────────────────────────────────────
-function buildLegend() {
-  const leg = document.getElementById('legend');
-  leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:6px;">Types</strong>';
-  for (const [label, color] of Object.entries(colors)) {
-    leg.innerHTML += `
-      <div class="legend-item">
-        <div class="legend-dot" style="background:${color};"></div>
-        ${label}
-      </div>`;
-  }
-}
-
-// Bouton légende (remplace l'élément fixe par un contrôle Leaflet)
+/* ══ LÉGENDE ══════════════════════════════════════════ */
 const legendCtrl = L.control({ position: 'bottomright' });
 legendCtrl.onAdd = function() {
-  const div = L.DomUtil.create('div', 'map-btn');
-  div.innerHTML = "🗺";
-  div.title = "Légende";
-  div.style.fontSize = "20px";
-  L.DomEvent.on(div, 'click', function(e) {
-    L.DomEvent.stopPropagation(e);
-    const leg = document.getElementById('legend');
-    leg.classList.toggle('hidden');
-  });
-  return div;
+  const wrap = L.DomUtil.create('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:6px;';
+  L.DomEvent.disableClickPropagation(wrap);
+
+  const leg = document.createElement('div');
+  leg.id = 'legend';
+  leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:6px;">Types</strong>';
+  for (const [label, color] of Object.entries(COLORS)) {
+    leg.innerHTML += `<div class="legend-item">
+      <div class="legend-dot" style="background:${color};"></div>${label}
+    </div>`;
+  }
+  wrap.appendChild(leg);
+
+  const btn = document.createElement('div');
+  btn.className = 'map-btn';
+  btn.innerHTML = "🗺";
+  btn.title = "Légende";
+  btn.addEventListener('click', () => leg.classList.toggle('visible'));
+  wrap.appendChild(btn);
+
+  return wrap;
 };
 legendCtrl.addTo(map);
-buildLegend();
 
-// ── Panneau bas ────────────────────────────────────────
-const panel  = document.getElementById("panel");
+/* ══ PANNEAU BAS ══════════════════════════════════════ */
+const panel   = document.getElementById("panel");
 const content = document.getElementById("content");
 const handle  = document.getElementById("handle");
 
-function field(icon, value, link) {
-  if (!value || value.trim() === "" || value === "undefined") {
-    return `<p><span class="ic">${icon}</span><span class="empty-field">—</span></p>`;
-  }
-  const inner = link
-    ? `<a href="${link}" target="_blank">${value}</a>`
-    : value;
-  return `<p><span class="ic">${icon}</span>${inner}</p>`;
+function fieldHtml(icon, value, href) {
+  if (!value || String(value).trim() === "" || value === "undefined" || value === "null") return "";
+  const inner = href ? `<a href="${href}" target="_blank">${value}</a>` : value;
+  return `<p><span>${icon}</span><span>${inner}</span></p>`;
 }
 
-function openPanel(data) {
-  const type   = data["Type de point d'intérêt"] || "Point d'intérêt";
-  const adress = data["Adresse"] || "";
-  const contact = data["Contact(s)"] || "";
-  const phone  = data["Téléphone(s)"] || "";
-  const avis   = data["Avis"] || "";
-  const date   = data["Date de la dernière visite"] || "";
-  const comm   = data["Commentaires"] || "";
+function openPanel(item) {
+  const type    = item["Type de point d'intérêt"] || "Point d'intérêt";
+  const adresse = item["Adresse"] || "";
+  const contact = item["Contact(s)"] || "";
+  const phone   = item["Téléphone(s)"] || "";
+  const avis    = item["Avis"] || "";
+  const date    = item["Date de la dernière visite"] || "";
+  const comm    = item["Commentaires"] || "";
 
-  const mapsLink = adress
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adress)}`
-    : null;
-  const telLink = phone ? `tel:${phone}` : null;
+  const color    = COLORS[type] || COLORS["Autre"];
+  const mapsHref = adresse ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adresse)}` : null;
+  const telHref  = phone   ? `tel:${phone}` : null;
 
   content.innerHTML = `
     <h3>${type}</h3>
-    ${field("📍", adress, mapsLink)}
-    ${field("👤", contact)}
-    ${field("📞", phone, telLink)}
-    ${field("⭐", avis)}
-    ${field("📅", date)}
-    ${comm ? `<p><span class="ic">💬</span>${comm}</p>` : ""}
+    <span class="type-badge" style="background:${color};">${type}</span>
+    ${fieldHtml("📍", adresse, mapsHref)}
+    ${fieldHtml("👤", contact)}
+    ${fieldHtml("📞", phone, telHref)}
+    ${fieldHtml("⭐", avis)}
+    ${fieldHtml("📅", date)}
+    ${fieldHtml("💬", comm)}
   `;
   panel.classList.add("open");
 }
 
-map.on('click', () => {
-  panel.classList.remove("open");
-  document.getElementById('legend').classList.add('hidden');
-});
+/* Fermer en cliquant la carte */
+map.on('click', () => panel.classList.remove("open"));
 
-// Swipe down pour fermer
-let startY = 0;
-handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
-handle.addEventListener('touchmove', e => {
-  if (e.touches[0].clientY - startY > 50) panel.classList.remove("open");
-});
+/* Swipe down */
+let swipeY = 0;
+handle.addEventListener('touchstart', e => { swipeY = e.touches[0].clientY; }, { passive: true });
+handle.addEventListener('touchmove',  e => {
+  if (e.touches[0].clientY - swipeY > 60) panel.classList.remove("open");
+}, { passive: true });
 
-// ── Chargement des données ─────────────────────────────
-function makeIcon(type) {
-  const color = colors[type] || colors["Autre"];
-  // BUG FIX : apostrophe dans type — on utilise une variable, pas inline dans le template HTML
+/* ══ ICÔNES POI ═══════════════════════════════════════ */
+function makePOIIcon(type) {
+  const color = COLORS[type] || COLORS["Autre"];
   return L.divIcon({
-    className: 'custom-icon',
-    html: `<div style="background:${color};width:20px;height:20px;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.35);"></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12]
+    className: '',
+    html: `<div style="background:${color};width:22px;height:22px;border-radius:50%;border:3px solid white;box-shadow:0 1px 5px rgba(0,0,0,0.4);"></div>`,
+    iconSize:   [22, 22],
+    iconAnchor: [11, 11]
   });
 }
 
+/* ══ DONNÉES ══════════════════════════════════════════ */
 fetch(API_URL)
   .then(res => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -334,71 +352,65 @@ fetch(API_URL)
       const lon = parseFloat(item["Longitude"]);
       if (isNaN(lat) || isNaN(lon)) return;
 
-      const type = item["Type de point d'intérêt"];
-      const marker = L.marker([lat, lon], { icon: makeIcon(type) });
-      marker.on('click', e => {
+      const type   = item["Type de point d'intérêt"] || "Autre";
+      const marker = L.marker([lat, lon], { icon: makePOIIcon(type) });
+
+      /*
+       * FIX CLIC : on écoute l'événement Leaflet 'click' sur le marker.
+       * stopPropagation empêche l'event de remonter à la carte
+       * (ce qui fermerait aussitôt le panneau).
+       * On ne bloque PAS le clic avant openPanel.
+       */
+      marker.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
         openPanel(item);
       });
+
       clusters.addLayer(marker);
     });
     map.addLayer(clusters);
   })
   .catch(err => {
-    console.error("Erreur chargement données :", err);
-    content.innerHTML = `<p style="color:red;">Impossible de charger les données.</p>`;
+    console.error("Erreur chargement :", err);
+    content.innerHTML = `<p style="color:#c00;">⚠️ Impossible de charger les données.<br><small>${err.message}</small></p>`;
     panel.classList.add("open");
   })
   .finally(() => {
     document.getElementById('loader').classList.add('hidden');
   });
 
-// ── Long clic → formulaire ─────────────────────────────
+/* ══ LONG CLIC → FORMULAIRE ═══════════════════════════ */
 const ring = document.getElementById('longpress-ring');
-let pressTimer;
+let pressTimer = null;
 
-function startLongPress(x, y, latlng) {
-  ring.style.left = x + 'px';
-  ring.style.top  = y + 'px';
+function startPress(cx, cy, latlng) {
+  ring.style.left = cx + 'px';
+  ring.style.top  = cy + 'px';
   ring.classList.add('active');
-
   pressTimer = setTimeout(async () => {
     ring.classList.remove('active');
     try {
-      const res  = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`
-      );
-      const data = await res.json();
-      const addr = data.display_name || "";
-
-      // Clipboard : silencieux si non disponible (HTTP)
-      try { await navigator.clipboard.writeText(addr); } catch (_) {}
-
-      window.open(FORM_URL, '_blank');
-    } catch(e) {
-      window.open(FORM_URL, '_blank');
-    }
+      const r    = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`);
+      const data = await r.json();
+      try { await navigator.clipboard.writeText(data.display_name || ""); } catch(_) {}
+    } catch(_) {}
+    window.open(FORM_URL, '_blank');
   }, 800);
 }
-
-function cancelLongPress() {
+function cancelPress() {
   clearTimeout(pressTimer);
   ring.classList.remove('active');
 }
 
-// Desktop
-map.on('mousedown', e => startLongPress(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng));
-map.on('mouseup',   cancelLongPress);
-map.on('mousemove', cancelLongPress);
-
-// Mobile
+map.on('mousedown',  e => startPress(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng));
+map.on('mouseup',    cancelPress);
+map.on('mousemove',  cancelPress);
 map.on('touchstart', e => {
   const t = e.originalEvent.touches[0];
-  startLongPress(t.clientX, t.clientY, e.latlng);
+  startPress(t.clientX, t.clientY, e.latlng);
 });
-map.on('touchend',   cancelLongPress);
-map.on('touchmove',  cancelLongPress);
-
+map.on('touchend',  cancelPress);
+map.on('touchmove', cancelPress);
 </script>
 </body>
 </html>
