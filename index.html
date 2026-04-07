@@ -125,14 +125,16 @@ body { margin: 0; font-family: Arial, sans-serif; }
   line-height: 1;
 }
 
-/* ── Légende ── */
+/* ── Légende interactive ── */
 #legend {
   background: white;
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 12px;
   display: none;
-  min-width: 160px;
+  min-width: 200px;
+  max-height: 300px;
+  overflow-y: auto;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   margin-bottom: 6px;
 }
@@ -150,6 +152,9 @@ body { margin: 0; font-family: Arial, sans-serif; }
   border: 2px solid white;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
   flex-shrink: 0;
+}
+.legend-checkbox {
+  margin-right: 6px;
 }
 
 /* ── Feedback long clic ── */
@@ -195,6 +200,10 @@ const COLORS = {
   "Autre":         "#757575"
 };
 
+// État des filtres (tous activés par défaut)
+const filters = {};
+Object.keys(COLORS).forEach(key => filters[key] = true);
+
 /* ══ CARTE ════════════════════════════════════════════ */
 const map = L.map('map', { zoomControl: false }).setView([46.8, 2.5], 6);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -202,12 +211,12 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
+// Groupes de marqueurs par type
+const markerGroups = {};
+Object.keys(COLORS).forEach(type => markerGroups[type] = L.featureGroup());
 const clusters = L.markerClusterGroup({ chunkedLoading: true });
 
-/* ══ MARQUEUR UTILISATEUR ════════════════════════════
-   Icône CSS distincte — point bleu avec halo pulsant
-   Complètement différent des ronds POI
-═══════════════════════════════════════════════════ */
+/* ══ MARQUEUR UTILISATEUR ═══════════════════════════════════════════════════ */
 const userIcon = L.divIcon({
   className: 'user-dot-wrapper',
   html: `<div class="user-dot-wrapper">
@@ -255,7 +264,7 @@ locateCtrl.onAdd = function() {
 };
 locateCtrl.addTo(map);
 
-/* ══ LÉGENDE ════════════════════════════════════════════ */
+/* ══ LÉGENDE INTERACTIVE ════════════════════════════════════════════ */
 const legendCtrl = L.control({ position: 'bottomright' });
 legendCtrl.onAdd = function() {
   const wrap = L.DomUtil.create('div');
@@ -264,12 +273,28 @@ legendCtrl.onAdd = function() {
 
   const leg = document.createElement('div');
   leg.id = 'legend';
-  leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:6px;">Types</strong>';
-  for (const [label, color] of Object.entries(COLORS)) {
-    leg.innerHTML += `<div class="legend-item">
-      <div class="legend-dot" style="background:${color};"></div>${label}
-    </div>`;
-  }
+  leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:6px;">Filtres</strong>';
+
+  // Ajouter une case à cocher pour chaque type
+  Object.entries(COLORS).forEach(([label, color]) => {
+    leg.innerHTML += `
+      <div class="legend-item">
+        <input type="checkbox" class="legend-checkbox" id="filter-${label}" checked>
+        <div class="legend-dot" style="background:${color};"></div>
+        <label for="filter-${label}">${label}</label>
+      </div>
+    `;
+  });
+
+  // Gestion des changements de filtre
+  leg.addEventListener('change', (e) => {
+    if (e.target.classList.contains('legend-checkbox')) {
+      const type = e.target.id.replace('filter-', '');
+      filters[type] = e.target.checked;
+      updateMarkersVisibility();
+    }
+  });
+
   wrap.appendChild(leg);
 
   const btn = document.createElement('div');
@@ -282,6 +307,17 @@ legendCtrl.onAdd = function() {
   return wrap;
 };
 legendCtrl.addTo(map);
+
+// Met à jour la visibilité des marqueurs en fonction des filtres
+function updateMarkersVisibility() {
+  Object.entries(markerGroups).forEach(([type, group]) => {
+    if (filters[type]) {
+      map.addLayer(group);
+    } else {
+      map.removeLayer(group);
+    }
+  });
+}
 
 /* ══ PANNEAU BAS ════════════════════════════════════════════ */
 const panel   = document.getElementById("panel");
@@ -361,9 +397,16 @@ fetch(API_URL)
           openPanel(item);
         });
 
-      clusters.addLayer(marker);
+      // Ajoute le marqueur au groupe correspondant
+      markerGroups[type].addLayer(marker);
     });
+
+    // Ajoute tous les groupes au cluster
+    Object.values(markerGroups).forEach(group => clusters.addLayer(group));
     map.addLayer(clusters);
+
+    // Applique les filtres initiaux
+    updateMarkersVisibility();
   })
   .catch(err => {
     console.error("Erreur chargement :", err);
@@ -389,13 +432,11 @@ function startPress(cx, cy, latlng) {
     ring.classList.remove('active');
 
     try {
-      // Récupérer l'adresse à partir des coordonnées
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`
       );
       const data = await response.json();
 
-      // Copier l'adresse dans le presse-papiers
       if (data.display_name) {
         try {
           await navigator.clipboard.writeText(data.display_name);
@@ -405,12 +446,11 @@ function startPress(cx, cy, latlng) {
         }
       }
 
-      // Ouvrir le Google Form dans un nouvel onglet
       window.open(FORM_URL, '_blank');
     } catch (error) {
       console.error("Erreur lors de la récupération de l'adresse :", error);
     }
-  }, 1000); // Délai de 1000 ms pour un long clic plus fiable
+  }, 1000);
 }
 
 function cancelPress() {
@@ -440,4 +480,3 @@ map.on('touchmove', e => {
 </script>
 </body>
 </html>
-
