@@ -18,7 +18,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
 #loader {
   position: fixed;
   inset: 0;
-  background: rgba(255,255,255,0.8);
+  background: rgba(255, 255, 255, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,7 +26,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
 }
 #loader.hidden { display: none; }
 .spinner {
-  width: 40px; height: 40px;
+  width: 40px;
+  height: 40px;
   border: 4px solid #ddd;
   border-top-color: #3266ad;
   border-radius: 50%;
@@ -37,7 +38,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
 /* ── Marqueur utilisateur pulsant ── */
 .user-dot-wrapper {
   position: relative;
-  width: 20px; height: 20px;
+  width: 20px;
+  height: 20px;
 }
 .user-dot {
   position: absolute;
@@ -45,19 +47,19 @@ body { margin: 0; font-family: Arial, sans-serif; }
   background: #3266ad;
   border-radius: 50%;
   border: 3px solid white;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4);
   z-index: 2;
 }
 .user-pulse {
   position: absolute;
   inset: -7px;
-  background: rgba(50,102,173,0.25);
+  background: rgba(50, 102, 173, 0.25);
   border-radius: 50%;
   animation: pulse 2s ease-out infinite;
   z-index: 1;
 }
 @keyframes pulse {
-  0%   { transform: scale(0.5); opacity: 1; }
+  0% { transform: scale(0.5); opacity: 1; }
   100% { transform: scale(1.9); opacity: 0; }
 }
 
@@ -71,16 +73,17 @@ body { margin: 0; font-family: Arial, sans-serif; }
   background: white;
   border-top-left-radius: 18px;
   border-top-right-radius: 18px;
-  box-shadow: 0 -3px 16px rgba(0,0,0,0.18);
+  box-shadow: 0 -3px 16px rgba(0, 0, 0, 0.18);
   padding: 12px 18px 28px;
-  transition: bottom 0.32s cubic-bezier(.4,0,.2,1);
+  transition: bottom 0.32s cubic-bezier(0.4, 0, 0.2, 1);
   overflow-y: auto;
   z-index: 1000;
 }
 #panel.open { bottom: 0; }
 
 #handle {
-  width: 44px; height: 5px;
+  width: 44px;
+  height: 5px;
   background: #ccc;
   border-radius: 4px;
   margin: 0 auto 14px;
@@ -110,8 +113,13 @@ body { margin: 0; font-family: Arial, sans-serif; }
   gap: 8px;
   line-height: 1.5;
 }
-#content a { color: #3266ad; text-decoration: none; }
-#content a:hover { text-decoration: underline; }
+#content a {
+  color: #3266ad;
+  text-decoration: none;
+}
+#content a:hover {
+  text-decoration: underline;
+}
 
 /* ── Boutons carte ── */
 .map-btn {
@@ -119,10 +127,11 @@ body { margin: 0; font-family: Arial, sans-serif; }
   padding: 10px 12px;
   font-size: 20px;
   border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   user-select: none;
   line-height: 1;
+  margin-bottom: 10px;
 }
 
 /* ── Légende interactive ── */
@@ -133,9 +142,9 @@ body { margin: 0; font-family: Arial, sans-serif; }
   font-size: 12px;
   display: none;
   min-width: 200px;
-  max-height: 300px;
+  max-height: 70vh;
   overflow-y: auto;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   margin-bottom: 6px;
 }
 #legend.visible { display: block; }
@@ -148,10 +157,11 @@ body { margin: 0; font-family: Arial, sans-serif; }
   cursor: pointer;
 }
 .legend-dot {
-  width: 14px; height: 14px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   border: 2px solid white;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
   flex-shrink: 0;
 }
 .legend-checkbox {
@@ -162,7 +172,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
 /* ── Feedback long clic ── */
 #longpress-ring {
   position: fixed;
-  width: 54px; height: 54px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
   border: 3px solid #3266ad;
   pointer-events: none;
@@ -172,6 +183,14 @@ body { margin: 0; font-family: Arial, sans-serif; }
   opacity: 0.7;
 }
 #longpress-ring.active { transform: translate(-50%, -50%) scale(1); }
+
+/* Adaptation pour mobile */
+@media (max-width: 768px) {
+  #legend {
+    max-height: 50vh;
+    margin-bottom: 10px;
+  }
+}
 </style>
 </head>
 
@@ -189,7 +208,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
 
 <script>
 /* ══ CONFIG ════════════════════════════════════════════ */
-const API_URL  = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfEX_UE8x8YAh7RypfVLBaZdMAH_u85SIJFnJKfZ3tSc_bpxw/viewform";
 
 const COLORS = {
@@ -267,14 +286,14 @@ locateCtrl.onAdd = function() {
 locateCtrl.addTo(map);
 
 /* ══ LÉGENDE INTERACTIVE ════════════════════════════════════════════ */
-const legendCtrl = L.control({ position: 'bottomright' });
+const legendCtrl = L.control({ position: 'topleft' });
 legendCtrl.onAdd = function() {
-  const wrap = L.DomUtil.create('div');
-  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:6px;';
-  L.DomEvent.disableClickPropagation(wrap);
+  const container = L.DomUtil.create('div', 'legend-container');
+  container.style.marginTop = '50px'; // Espace pour le bouton de géolocalisation
 
   const leg = document.createElement('div');
   leg.id = 'legend';
+  leg.style.display = 'none';
   leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:6px;">Filtres</strong>';
 
   // Ajouter une case à cocher pour chaque type
@@ -297,16 +316,16 @@ legendCtrl.onAdd = function() {
     }
   });
 
-  wrap.appendChild(leg);
+  container.appendChild(leg);
 
   const btn = document.createElement('div');
   btn.className = 'map-btn';
   btn.innerHTML = "🗺";
   btn.title = "Légende";
   btn.addEventListener('click', () => leg.classList.toggle('visible'));
-  wrap.appendChild(btn);
+  container.appendChild(btn);
 
-  return wrap;
+  return container;
 };
 legendCtrl.addTo(map);
 
