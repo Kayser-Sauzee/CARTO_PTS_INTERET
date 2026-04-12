@@ -1,3 +1,4 @@
+Mieux (légende OK mais pas ajout d’adresse) :
 <!DOCTYPE html>
 <html>
 <head>
@@ -174,122 +175,20 @@ body { margin: 0; font-family: Arial, sans-serif; }
   cursor: pointer;
 }
 
-/* ── Viseur central ── */
-#crosshair {
+/* ── Feedback long clic ── */
+#longpress-ring {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  z-index: 1500;
-}
-#crosshair.hidden { display: none; }
-#crosshair-inner {
-  width: 40px;
-  height: 40px;
-  position: relative;
-}
-#crosshair-inner::before,
-#crosshair-inner::after {
-  content: '';
-  position: absolute;
-  background: #e03232;
-  border-radius: 2px;
-}
-#crosshair-inner::before { width: 2px; height: 100%; top: 0; left: 50%; transform: translateX(-50%); }
-#crosshair-inner::after  { width: 100%; height: 2px; top: 50%; left: 0; transform: translateY(-50%); }
-/* point central */
-#crosshair-inner {
-  box-shadow: inset 0 0 0 2px #e03232;
-  border-radius: 50%;
-  border: 2px solid #e03232;
-  background: rgba(224,50,50,0.08);
-}
-#crosshair-label {
-  text-align: center;
-  font-size: 11px;
-  color: #333;
-  background: rgba(255,255,255,0.85);
-  border-radius: 8px;
-  padding: 3px 8px;
-  margin-top: 6px;
-  white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-}
-
-/* ── Bouton "+" flottant ── */
-#add-btn {
-  position: fixed;
-  bottom: 28px;
-  right: 18px;
   width: 54px;
   height: 54px;
-  background: #3266ad;
-  color: white;
-  font-size: 28px;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3px 12px rgba(0,0,0,0.3);
-  cursor: pointer;
-  z-index: 1200;
-  user-select: none;
-  transition: background 0.2s, transform 0.15s;
-  line-height: 1;
+  border: 3px solid #3266ad;
+  pointer-events: none;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.8s ease;
+  z-index: 2000;
+  opacity: 0.7;
 }
-#add-btn:active { transform: scale(0.93); background: #254d8a; }
-#add-btn.active { background: #e03232; }
-
-/* ── Barre de confirmation ── */
-#confirm-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px 22px;
-  background: white;
-  box-shadow: 0 -3px 16px rgba(0,0,0,0.15);
-  z-index: 1300;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-}
-#confirm-bar.hidden { display: none; }
-#confirm-address {
-  flex: 1;
-  font-size: 12px;
-  color: #555;
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-#confirm-bar button {
-  border: none;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: bold;
-  cursor: pointer;
-  white-space: nowrap;
-}
-#cancel-btn  { background: #f0f0f0; color: #555; }
-#confirm-btn {
-  background: #3266ad;
-  color: white;
-  text-decoration: none;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: bold;
-  white-space: nowrap;
-  display: inline-block;
-}
+#longpress-ring.active { transform: translate(-50%, -50%) scale(1); }
 
 /* Adaptation pour mobile */
 @media (max-width: 768px) {
@@ -308,19 +207,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   <div id="handle"></div>
   <div id="content"></div>
 </div>
-<!-- Viseur mode ajout -->
-<div id="crosshair" class="hidden">
-  <div id="crosshair-inner"></div>
-  <div id="crosshair-label">Déplacez la carte, puis confirmez</div>
-</div>
-<!-- Bouton flottant ajout -->
-<div id="add-btn" title="Ajouter un point ici">＋</div>
-<!-- Barre de confirmation -->
-<div id="confirm-bar" class="hidden">
-  <button id="cancel-btn">✕ Annuler</button>
-  <div id="confirm-address">Chargement…</div>
-  <a id="confirm-btn" target="_blank">✓ Ouvrir formulaire</a>
-</div>
+<div id="longpress-ring"></div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
@@ -559,84 +446,87 @@ fetch(API_URL)
     document.getElementById('loader').classList.add('hidden');
   });
 
-/* ══ MODE AJOUT : BOUTON + VISEUR CENTRÉ ═══════════════════════════════════
-   1. L'utilisateur tape le bouton "+"
-   2. Un viseur apparaît au centre de la carte, la carte reste navigable
-   3. Il navigue pour pointer l'endroit voulu
-   4. Une barre basse affiche l'adresse (reverse geocoding en temps réel)
-   5. Il tape "✓ Ouvrir formulaire" → ouvre le formulaire Google
-   6. "✕ Annuler" → quitte le mode
+/* ══ LONG CLIC → FORMULAIRE ═══════════════════════════════════════════════════
+   FIX : on écoute directement sur l'élément DOM du conteneur de la carte,
+   ce qui évite que les couches Leaflet (tuiles, clusters, marqueurs) 
+   n'avalent les événements touch avant qu'on puisse les intercepter.
+   On stocke la position latlng via map.mouseEventToLatLng().
 */
-const addBtn     = document.getElementById('add-btn');
-const crosshair  = document.getElementById('crosshair');
-const confirmBar = document.getElementById('confirm-bar');
-const confirmBtn = document.getElementById('confirm-btn');
-const cancelBtn  = document.getElementById('cancel-btn');
-const addrLabel  = document.getElementById('confirm-address');
+const ring = document.getElementById('longpress-ring');
+let pressTimer       = null;
+let longPressLatLng  = null;
+let touchMoved       = false;
 
-let addMode       = false;
-let geocodeTimer  = null;
-let currentLatLng = null;
+const mapContainer = map.getContainer();
 
-function enterAddMode() {
-  addMode = true;
-  addBtn.classList.add('active');
-  addBtn.textContent = '✕';
-  crosshair.classList.remove('hidden');
-  confirmBar.classList.remove('hidden');
-  panel.classList.remove('open');
-  addrLabel.textContent = 'Chargement…';
-  updateFromCenter();
-}
+function startLongPress(clientX, clientY, latlng) {
+  touchMoved = false;
+  longPressLatLng = latlng;
 
-function exitAddMode() {
-  addMode = false;
-  addBtn.classList.remove('active');
-  addBtn.textContent = '＋';
-  crosshair.classList.add('hidden');
-  confirmBar.classList.add('hidden');
-  clearTimeout(geocodeTimer);
-}
+  ring.style.left = clientX + 'px';
+  ring.style.top  = clientY + 'px';
+  ring.classList.add('active');
 
-/* Reverse geocoding depuis le centre de la carte */
-function updateFromCenter() {
-  const c = map.getCenter();
-  currentLatLng = c;
-  addrLabel.textContent = 'Chargement…';
-  confirmBtn.removeAttribute('href');
+  pressTimer = setTimeout(async () => {
+    ring.classList.remove('active');
+    if (touchMoved || !longPressLatLng) return;
 
-  clearTimeout(geocodeTimer);
-  geocodeTimer = setTimeout(async () => {
     try {
-      const r = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${c.lat}&lon=${c.lng}&accept-language=fr`
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${longPressLatLng.lat}&lon=${longPressLatLng.lng}`
       );
-      const d = await r.json();
-      const adresse = d.display_name || `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
-      addrLabel.textContent = adresse;
-      confirmBtn.href = FORM_URL + '&entry.887599449=' + encodeURIComponent(adresse);
-    } catch {
-      const fallback = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
-      addrLabel.textContent = fallback;
-      confirmBtn.href = FORM_URL + '&entry.887599449=' + encodeURIComponent(fallback);
+      const data = await response.json();
+
+      if (data.display_name) {
+        try {
+          await navigator.clipboard.writeText(data.display_name);
+        } catch (e) {
+          console.warn("Clipboard non disponible :", e);
+        }
+      }
+    } catch (err) {
+      console.warn("Reverse geocoding échoué :", err);
     }
-  }, 600);
+
+    window.open(FORM_URL, '_blank');
+  }, 900);
 }
 
-addBtn.addEventListener('click', () => {
-  if (addMode) exitAddMode(); else enterAddMode();
+function cancelLongPress() {
+  clearTimeout(pressTimer);
+  ring.classList.remove('active');
+}
+
+/* ─── Touch (mobile) ─── */
+mapContainer.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  /* Convertit les coordonnées écran en latlng Leaflet */
+  const point  = map.mouseEventToContainerPoint({ clientX: t.clientX, clientY: t.clientY });
+  const latlng = map.containerPointToLatLng(point);
+  startLongPress(t.clientX, t.clientY, latlng);
+}, { passive: true });
+
+mapContainer.addEventListener('touchmove', () => {
+  touchMoved = true;
+  cancelLongPress();
+}, { passive: true });
+
+mapContainer.addEventListener('touchend',   cancelLongPress, { passive: true });
+mapContainer.addEventListener('touchcancel', cancelLongPress, { passive: true });
+
+/* ─── Souris (desktop) ─── */
+mapContainer.addEventListener('mousedown', e => {
+  if (e.button !== 0) return; /* clic gauche uniquement */
+  const point  = map.mouseEventToContainerPoint(e);
+  const latlng = map.containerPointToLatLng(point);
+  startLongPress(e.clientX, e.clientY, latlng);
 });
 
-cancelBtn.addEventListener('click', exitAddMode);
-
-/* Le lien <a> s'ouvre nativement — on ferme juste le mode après */
-confirmBtn.addEventListener('click', () => {
-  if (!confirmBtn.href) return;
-  setTimeout(exitAddMode, 300);
+mapContainer.addEventListener('mouseup',   cancelLongPress);
+mapContainer.addEventListener('mousemove', () => {
+  touchMoved = true;
+  cancelLongPress();
 });
-
-/* Mise à jour de l'adresse à chaque déplacement de la carte */
-map.on('moveend', () => { if (addMode) updateFromCenter(); });
 </script>
 </body>
 </html>
