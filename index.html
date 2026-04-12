@@ -279,7 +279,17 @@ body { margin: 0; font-family: Arial, sans-serif; }
   white-space: nowrap;
 }
 #cancel-btn  { background: #f0f0f0; color: #555; }
-#confirm-btn { background: #3266ad; color: white; }
+#confirm-btn {
+  background: #3266ad;
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  display: inline-block;
+}
 
 /* Adaptation pour mobile */
 @media (max-width: 768px) {
@@ -309,7 +319,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
 <div id="confirm-bar" class="hidden">
   <button id="cancel-btn">✕ Annuler</button>
   <div id="confirm-address">Chargement…</div>
-  <button id="confirm-btn">✓ Ouvrir formulaire</button>
+  <a id="confirm-btn" target="_blank">✓ Ouvrir formulaire</a>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -592,7 +602,8 @@ function exitAddMode() {
 function updateFromCenter() {
   const c = map.getCenter();
   currentLatLng = c;
-  addrLabel.textContent = '📍 Chargement de l\'adresse…';
+  addrLabel.textContent = 'Chargement…';
+  confirmBtn.removeAttribute('href');
 
   clearTimeout(geocodeTimer);
   geocodeTimer = setTimeout(async () => {
@@ -601,11 +612,15 @@ function updateFromCenter() {
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${c.lat}&lon=${c.lng}&accept-language=fr`
       );
       const d = await r.json();
-      addrLabel.textContent = d.display_name || `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+      const adresse = d.display_name || `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+      addrLabel.textContent = adresse;
+      confirmBtn.href = FORM_URL + '&entry.887599449=' + encodeURIComponent(adresse);
     } catch {
-      addrLabel.textContent = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+      const fallback = `${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+      addrLabel.textContent = fallback;
+      confirmBtn.href = FORM_URL + '&entry.887599449=' + encodeURIComponent(fallback);
     }
-  }, 600); /* délai pour ne pas spammer Nominatim pendant le déplacement */
+  }, 600);
 }
 
 addBtn.addEventListener('click', () => {
@@ -614,11 +629,10 @@ addBtn.addEventListener('click', () => {
 
 cancelBtn.addEventListener('click', exitAddMode);
 
+/* Le lien <a> s'ouvre nativement — on ferme juste le mode après */
 confirmBtn.addEventListener('click', () => {
-  const adresse = addrLabel.textContent.replace(/^📍\s*/, '').trim();
-  const url = FORM_URL + '&entry.887599449=' + encodeURIComponent(adresse);
-  window.open(url, '_blank');
-  exitAddMode();
+  if (!confirmBtn.href) return;
+  setTimeout(exitAddMode, 300);
 });
 
 /* Mise à jour de l'adresse à chaque déplacement de la carte */
