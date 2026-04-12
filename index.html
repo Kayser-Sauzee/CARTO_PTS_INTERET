@@ -36,6 +36,10 @@ body { margin: 0; font-family: Arial, sans-serif; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Marqueur utilisateur pulsant ── */
+.user-marker {
+  background: none !important;
+  border: none !important;
+}
 .user-dot-wrapper {
   position: relative;
   width: 20px;
@@ -132,6 +136,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   user-select: none;
   line-height: 1;
   margin-bottom: 10px;
+  display: block;
 }
 
 /* ── Légende interactive ── */
@@ -208,7 +213,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
 
 <script>
 /* ══ CONFIG ════════════════════════════════════════════ */
-const API_URL = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
+const API_URL  = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfEX_UE8x8YAh7RypfVLBaZdMAH_u85SIJFnJKfZ3tSc_bpxw/viewform";
 
 const COLORS = {
@@ -221,10 +226,6 @@ const COLORS = {
   "Autre":         "#757575"
 };
 
-// État des filtres (tous activés par défaut)
-const filters = {};
-Object.keys(COLORS).forEach(key => filters[key] = true);
-
 /* ══ CARTE ════════════════════════════════════════════ */
 const map = L.map('map', { zoomControl: false }).setView([46.8, 2.5], 6);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -232,21 +233,29 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-// Groupes de marqueurs par type
-const markerGroups = {};
-Object.keys(COLORS).forEach(type => markerGroups[type] = L.featureGroup());
-const clusters = L.markerClusterGroup({ chunkedLoading: true });
+/* ══ CLUSTERS PAR TYPE (FIX LÉGENDE) ════════════════════════════════════════
+   Chaque type a son propre MarkerClusterGroup.
+   Cela permet d'ajouter / retirer un groupe entier de la carte sans
+   casser le clustering des autres types.
+*/
+const clusterGroups = {};
+Object.keys(COLORS).forEach(type => {
+  clusterGroups[type] = L.markerClusterGroup({ chunkedLoading: true });
+});
 
-/* ══ MARQUEUR UTILISATEUR ═══════════════════════════════════════════════════ */
+/* État des filtres */
+const filters = {};
+Object.keys(COLORS).forEach(key => filters[key] = true);
+
+/* ══ MARQUEUR UTILISATEUR ════════════════════════════════════════════════════ */
 const userIcon = L.divIcon({
-  className: 'user-dot-wrapper',
+  className: 'user-marker',
   html: `<div class="user-dot-wrapper">
            <div class="user-pulse"></div>
            <div class="user-dot"></div>
          </div>`,
   iconSize:   [20, 20],
-  iconAnchor: [10, 10],
-  className: 'user-marker'
+  iconAnchor: [10, 10]
 });
 
 let userMarker = null;
@@ -289,25 +298,27 @@ locateCtrl.addTo(map);
 const legendCtrl = L.control({ position: 'topleft' });
 legendCtrl.onAdd = function() {
   const container = L.DomUtil.create('div', 'legend-container');
-  container.style.marginTop = '50px'; // Espace pour le bouton de géolocalisation
 
   const leg = document.createElement('div');
   leg.id = 'legend';
-  leg.style.display = 'none';
-  leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:6px;">Filtres</strong>';
+  leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:8px;">Filtres</strong>';
 
-  // Ajouter une case à cocher pour chaque type
   Object.entries(COLORS).forEach(([label, color]) => {
-    leg.innerHTML += `
-      <div class="legend-item">
-        <input type="checkbox" class="legend-checkbox" id="filter-${label}" checked>
-        <div class="legend-dot" style="background:${color};"></div>
-        <label for="filter-${label}">${label}</label>
-      </div>
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `
+      <input type="checkbox" class="legend-checkbox" id="filter-${label}" checked>
+      <div class="legend-dot" style="background:${color};"></div>
+      <label for="filter-${label}" style="cursor:pointer;">${label}</label>
     `;
+    leg.appendChild(item);
   });
 
-  // Gestion des changements de filtre
+  /* FIX : stopPropagation pour que les clics dans la légende
+     ne déclenchent pas le long-press de la carte */
+  L.DomEvent.disableClickPropagation(leg);
+  L.DomEvent.on(leg, 'touchstart touchend touchmove mousedown mouseup', L.DomEvent.stopPropagation);
+
   leg.addEventListener('change', (e) => {
     if (e.target.classList.contains('legend-checkbox')) {
       const type = e.target.id.replace('filter-', '');
@@ -316,26 +327,27 @@ legendCtrl.onAdd = function() {
     }
   });
 
-  container.appendChild(leg);
-
   const btn = document.createElement('div');
   btn.className = 'map-btn';
   btn.innerHTML = "🗺";
-  btn.title = "Légende";
+  btn.title = "Légende / Filtres";
+  L.DomEvent.disableClickPropagation(btn);
+  L.DomEvent.on(btn, 'touchstart touchend mousedown mouseup', L.DomEvent.stopPropagation);
   btn.addEventListener('click', () => leg.classList.toggle('visible'));
-  container.appendChild(btn);
 
+  container.appendChild(leg);
+  container.appendChild(btn);
   return container;
 };
 legendCtrl.addTo(map);
 
-// Met à jour la visibilité des marqueurs en fonction des filtres
+/* Met à jour la visibilité des clusters par type */
 function updateMarkersVisibility() {
-  Object.entries(markerGroups).forEach(([type, group]) => {
+  Object.entries(clusterGroups).forEach(([type, group]) => {
     if (filters[type]) {
-      map.addLayer(group);
+      if (!map.hasLayer(group)) map.addLayer(group);
     } else {
-      map.removeLayer(group);
+      if (map.hasLayer(group)) map.removeLayer(group);
     }
   });
 }
@@ -377,10 +389,8 @@ function openPanel(item) {
   panel.classList.add("open");
 }
 
-/* Fermer en cliquant la carte */
 map.on('click', () => panel.classList.remove("open"));
 
-/* Swipe down */
 let swipeY = 0;
 handle.addEventListener('touchstart', e => { swipeY = e.touches[0].clientY; }, { passive: true });
 handle.addEventListener('touchmove',  e => {
@@ -411,6 +421,8 @@ fetch(API_URL)
       if (isNaN(lat) || isNaN(lon)) return;
 
       const type   = item["Type de point d'intérêt"] || "Autre";
+      const group  = clusterGroups[type] || clusterGroups["Autre"];
+
       const marker = L.marker([lat, lon], { icon: makePOIIcon(type) })
         .bindPopup(`<b>${type}</b><br>${item["Adresse"] || ""}`)
         .on('click', function(e) {
@@ -418,16 +430,11 @@ fetch(API_URL)
           openPanel(item);
         });
 
-      // Ajoute le marqueur au groupe correspondant
-      markerGroups[type].addLayer(marker);
+      group.addLayer(marker);
     });
 
-    // Ajoute tous les groupes au cluster
-    Object.values(markerGroups).forEach(group => clusters.addLayer(group));
-    map.addLayer(clusters);
-
-    // Applique les filtres initiaux
-    updateMarkersVisibility();
+    /* Ajoute chaque cluster group sur la carte */
+    Object.values(clusterGroups).forEach(group => map.addLayer(group));
   })
   .catch(err => {
     console.error("Erreur chargement :", err);
@@ -438,65 +445,86 @@ fetch(API_URL)
     document.getElementById('loader').classList.add('hidden');
   });
 
-/* ══ LONG CLIC → FORMULAIRE ═══════════════════════════ */
+/* ══ LONG CLIC → FORMULAIRE ═══════════════════════════════════════════════════
+   FIX : on écoute directement sur l'élément DOM du conteneur de la carte,
+   ce qui évite que les couches Leaflet (tuiles, clusters, marqueurs) 
+   n'avalent les événements touch avant qu'on puisse les intercepter.
+   On stocke la position latlng via map.mouseEventToLatLng().
+*/
 const ring = document.getElementById('longpress-ring');
-let pressTimer = null;
-let isLongPressActive = false;
+let pressTimer       = null;
+let longPressLatLng  = null;
+let touchMoved       = false;
 
-function startPress(cx, cy, latlng) {
-  ring.style.left = cx + 'px';
-  ring.style.top  = cy + 'px';
+const mapContainer = map.getContainer();
+
+function startLongPress(clientX, clientY, latlng) {
+  touchMoved = false;
+  longPressLatLng = latlng;
+
+  ring.style.left = clientX + 'px';
+  ring.style.top  = clientY + 'px';
   ring.classList.add('active');
 
   pressTimer = setTimeout(async () => {
-    isLongPressActive = true;
     ring.classList.remove('active');
+    if (touchMoved || !longPressLatLng) return;
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${longPressLatLng.lat}&lon=${longPressLatLng.lng}`
       );
       const data = await response.json();
 
       if (data.display_name) {
         try {
           await navigator.clipboard.writeText(data.display_name);
-          console.log("Adresse copiée :", data.display_name);
-        } catch (clipboardError) {
-          console.error("Erreur lors de la copie dans le presse-papiers :", clipboardError);
+        } catch (e) {
+          console.warn("Clipboard non disponible :", e);
         }
       }
-
-      window.open(FORM_URL, '_blank');
-    } catch (error) {
-      console.error("Erreur lors de la récupération de l'adresse :", error);
+    } catch (err) {
+      console.warn("Reverse geocoding échoué :", err);
     }
-  }, 1000);
+
+    window.open(FORM_URL, '_blank');
+  }, 900);
 }
 
-function cancelPress() {
-  if (!isLongPressActive) {
-    clearTimeout(pressTimer);
-    ring.classList.remove('active');
-  }
-  isLongPressActive = false;
+function cancelLongPress() {
+  clearTimeout(pressTimer);
+  ring.classList.remove('active');
 }
 
-map.on('mousedown', e => startPress(e.originalEvent.clientX, e.originalEvent.clientY, e.latlng));
-map.on('mouseup', cancelPress);
-map.on('mousemove', cancelPress);
+/* ─── Touch (mobile) ─── */
+mapContainer.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  /* Convertit les coordonnées écran en latlng Leaflet */
+  const point  = map.mouseEventToContainerPoint({ clientX: t.clientX, clientY: t.clientY });
+  const latlng = map.containerPointToLatLng(point);
+  startLongPress(t.clientX, t.clientY, latlng);
+}, { passive: true });
 
-map.on('touchstart', e => {
-  const t = e.originalEvent.touches[0];
-  startPress(t.clientX, t.clientY, e.latlng);
+mapContainer.addEventListener('touchmove', () => {
+  touchMoved = true;
+  cancelLongPress();
+}, { passive: true });
+
+mapContainer.addEventListener('touchend',   cancelLongPress, { passive: true });
+mapContainer.addEventListener('touchcancel', cancelLongPress, { passive: true });
+
+/* ─── Souris (desktop) ─── */
+mapContainer.addEventListener('mousedown', e => {
+  if (e.button !== 0) return; /* clic gauche uniquement */
+  const point  = map.mouseEventToContainerPoint(e);
+  const latlng = map.containerPointToLatLng(point);
+  startLongPress(e.clientX, e.clientY, latlng);
 });
 
-map.on('touchend', cancelPress);
-
-map.on('touchmove', e => {
-  if (!isLongPressActive) {
-    cancelPress();
-  }
+mapContainer.addEventListener('mouseup',   cancelLongPress);
+mapContainer.addEventListener('mousemove', () => {
+  touchMoved = true;
+  cancelLongPress();
 });
 </script>
 </body>
