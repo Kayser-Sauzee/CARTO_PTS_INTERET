@@ -615,7 +615,9 @@ addBtn.addEventListener('click', () => {
 cancelBtn.addEventListener('click', exitAddMode);
 
 confirmBtn.addEventListener('click', () => {
-  window.open(FORM_URL, '_blank');
+  const adresse = addrLabel.textContent.replace(/^📍\s*/, '').trim();
+  const url = FORM_URL + '&entry.887599449=' + encodeURIComponent(adresse);
+  window.open(url, '_blank');
   exitAddMode();
 });
 
