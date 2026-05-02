@@ -270,17 +270,24 @@ body { margin: 0; font-family: Arial, sans-serif; }
   padding: 8px 16px;
   border: none;
   border-radius: 6px;
-  cursor: pointer;
+  cursor: pointer; /* Curseur corrigé */
   font-size: 14px;
   font-weight: bold;
+  transition: background 0.2s;
 }
 #validation-panel #validate-btn {
   background: #3266ad;
   color: white;
 }
+#validation-panel #validate-btn:hover {
+  background: #254a80;
+}
 #validation-panel #cancel-btn {
   background: #f0f0f0;
   color: #333;
+}
+#validation-panel #cancel-btn:hover {
+  background: #e0e0e0;
 }
 
 /* Adaptation pour mobile */
@@ -565,41 +572,41 @@ let selectedLatLng = null;
 addPointBtn.addEventListener('click', () => {
   crosshairContainer.classList.add('active');
   validationPanel.style.display = 'flex';
+  updateCoords(); // Mettre à jour les coordonnées immédiatement
 
-  // Mettre à jour les coordonnées en temps réel
-  map.on('mousemove', updateCoords);
-  map.on('click', updateCoords);
+  // Mettre à jour les coordonnées à chaque mouvement de la carte
+  map.on('move', updateCoords);
 });
 
-// Mettre à jour les coordonnées affichées
-function updateCoords(e) {
+// Mettre à jour les coordonnées affichées (centre de la carte = position de la mire)
+function updateCoords() {
   if (!crosshairContainer.classList.contains('active')) return;
 
-  selectedLatLng = e.latlng;
+  selectedLatLng = map.getCenter(); // Coordonnées du centre de la carte
   coordsDisplay.textContent = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
 }
 
 // Valider les coordonnées et ouvrir le Google Form
-validateBtn.addEventListener('click', async () => {
+validateBtn.addEventListener('click', () => {
   if (!selectedLatLng) {
     alert("Veuillez sélectionner un point sur la carte.");
     return;
   }
 
-  try {
-    // Copier les coordonnées dans le presse-papiers
-    const coordsText = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
-    await navigator.clipboard.writeText(coordsText);
-
-    // Ouvrir le Google Form
-    window.open(FORM_URL, '_blank');
-
-    // Réinitialiser
-    resetCrosshair();
-  } catch (e) {
-    alert(`Erreur lors de la copie dans le presse-papiers. Veuillez copier manuellement : ${coordsDisplay.textContent}`);
-    resetCrosshair();
-  }
+  // Copier les coordonnées dans le presse-papiers
+  const coordsText = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
+  navigator.clipboard.writeText(coordsText)
+    .then(() => {
+      // Ouvrir le Google Form dans un nouvel onglet
+      window.open(FORM_URL, '_blank');
+      resetCrosshair();
+    })
+    .catch(() => {
+      // Si la copie échoue, afficher les coordonnées à copier manuellement
+      alert(`Coordonnées à copier manuellement : ${coordsText}`);
+      window.open(FORM_URL, '_blank');
+      resetCrosshair();
+    });
 });
 
 // Annuler
@@ -609,8 +616,7 @@ cancelBtn.addEventListener('click', resetCrosshair);
 function resetCrosshair() {
   crosshairContainer.classList.remove('active');
   validationPanel.style.display = 'none';
-  map.off('mousemove', updateCoords);
-  map.off('click', updateCoords);
+  map.off('move', updateCoords);
   selectedLatLng = null;
 }
 </script>
