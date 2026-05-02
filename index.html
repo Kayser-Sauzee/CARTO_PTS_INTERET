@@ -121,9 +121,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   color: #3266ad;
   text-decoration: none;
 }
-#content a:hover {
-  text-decoration: underline;
-}
+#content a:hover { text-decoration: underline; }
 
 /* ── Boutons carte ── */
 .map-btn {
@@ -174,7 +172,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   cursor: pointer;
 }
 
-/* ── Bouton "+" pour ajouter un point ── */
+/* ── Bouton "+" ── */
 #add-point-btn {
   position: fixed;
   bottom: 20px;
@@ -199,7 +197,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   transform: scale(1.05);
 }
 
-/* ── Mire (crosshair) et adresse ── */
+/* ── Mire (crosshair) ── */
 #crosshair-container {
   position: fixed;
   top: 0;
@@ -210,9 +208,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
   z-index: 2000;
   pointer-events: none;
 }
-#crosshair-container.active {
-  display: block;
-}
+#crosshair-container.active { display: block; }
+
 #crosshair {
   position: absolute;
   top: 50%;
@@ -239,6 +236,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
   top: 50%;
   transform: translateY(-50%);
 }
+
+/* ── Bulle d'adresse ── */
 #coords-display {
   position: fixed;
   bottom: 100px;
@@ -246,7 +245,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.95);
   padding: 10px 16px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 13px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   z-index: 2001;
@@ -254,10 +253,14 @@ body { margin: 0; font-family: Arial, sans-serif; }
   font-family: Arial, sans-serif;
   max-width: 85vw;
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.5;
+  color: #222;
+  /* Animation douce à l'apparition du texte */
+  transition: opacity 0.2s;
 }
+#coords-display.loading { opacity: 0.55; }
 
-/* ── Panneau Valider / Annuler (HORS crosshair-container) ── */
+/* ── Panneau Valider / Annuler ── */
 #validation-panel {
   position: fixed;
   bottom: 20px;
@@ -282,38 +285,16 @@ body { margin: 0; font-family: Arial, sans-serif; }
   transition: background 0.2s, transform 0.1s;
   pointer-events: auto;
 }
-#validation-panel button:hover {
-  cursor: pointer;
-  transform: scale(1.04);
-}
-#validation-panel #validate-btn {
-  background: #3266ad;
-  color: white;
-}
-#validation-panel #validate-btn:hover {
-  background: #254a80;
-}
-#validation-panel #cancel-btn {
-  background: #f0f0f0;
-  color: #333;
-}
-#validation-panel #cancel-btn:hover {
-  background: #e0e0e0;
-}
+#validation-panel button:hover { transform: scale(1.04); }
+#validation-panel #validate-btn { background: #3266ad; color: white; }
+#validation-panel #validate-btn:hover { background: #254a80; }
+#validation-panel #cancel-btn { background: #f0f0f0; color: #333; }
+#validation-panel #cancel-btn:hover { background: #e0e0e0; }
 
-/* Adaptation mobile */
 @media (max-width: 768px) {
-  #legend {
-    max-height: 50vh;
-    margin-bottom: 10px;
-  }
-  #validation-panel {
-    width: 90%;
-    flex-direction: column;
-  }
-  #validation-panel button {
-    width: 100%;
-  }
+  #legend { max-height: 50vh; margin-bottom: 10px; }
+  #validation-panel { width: 90%; flex-direction: column; }
+  #validation-panel button { width: 100%; }
 }
 </style>
 </head>
@@ -321,21 +302,19 @@ body { margin: 0; font-family: Arial, sans-serif; }
 <body>
 <div id="loader"><div class="spinner"></div></div>
 <div id="map"></div>
+
 <div id="panel">
   <div id="handle"></div>
   <div id="content"></div>
 </div>
 
-<!-- Bouton "+" pour ajouter un point -->
 <button id="add-point-btn">+</button>
 
-<!-- Mire (crosshair) et adresse — pointer-events:none sur le container -->
 <div id="crosshair-container">
   <div id="crosshair"></div>
   <div id="coords-display">📍 Recherche de l'adresse…</div>
 </div>
 
-<!-- Panneau Valider/Annuler HORS du crosshair-container pour recevoir les clics -->
 <div id="validation-panel" style="display:none; flex-direction:row;">
   <button id="validate-btn">✅ Valider</button>
   <button id="cancel-btn">✖ Annuler</button>
@@ -345,7 +324,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
 <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
 
 <script>
-/* ══ CONFIG ════════════════════════════════════════════ */
+/* ══ CONFIG ══════════════════════════════════════════════════════════════ */
 const API_URL  = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfEX_UE8x8YAh7RypfVLBaZdMAH_u85SIJFnJKfZ3tSc_bpxw/viewform";
 
@@ -359,14 +338,14 @@ const COLORS = {
   "Autre":         "#757575"
 };
 
-/* ══ CARTE ════════════════════════════════════════════ */
+/* ══ CARTE ═══════════════════════════════════════════════════════════════ */
 const map = L.map('map', { zoomControl: false }).setView([46.8, 2.5], 6);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap'
 }).addTo(map);
 L.control.zoom({ position: 'topright' }).addTo(map);
 
-/* ══ CLUSTERS PAR TYPE ════════════════════════════════════════════ */
+/* ══ CLUSTERS PAR TYPE ═══════════════════════════════════════════════════ */
 const clusterGroups = {};
 Object.keys(COLORS).forEach(type => {
   clusterGroups[type] = L.markerClusterGroup({ chunkedLoading: true });
@@ -375,7 +354,7 @@ Object.keys(COLORS).forEach(type => {
 const filters = {};
 Object.keys(COLORS).forEach(key => filters[key] = true);
 
-/* ══ MARQUEUR UTILISATEUR ════════════════════════════════════════════════════ */
+/* ══ MARQUEUR UTILISATEUR ════════════════════════════════════════════════ */
 const userIcon = L.divIcon({
   className: 'user-marker',
   html: `<div class="user-dot-wrapper">
@@ -387,17 +366,14 @@ const userIcon = L.divIcon({
 });
 
 let userMarker = null;
-
 function setUserPos(latlng) {
   if (!userMarker) {
     userMarker = L.marker(latlng, { icon: userIcon, zIndexOffset: 2000 })
-      .addTo(map)
-      .bindPopup("📍 Vous êtes ici");
+      .addTo(map).bindPopup("📍 Vous êtes ici");
   } else {
     userMarker.setLatLng(latlng);
   }
 }
-
 navigator.geolocation.watchPosition(
   pos => setUserPos([pos.coords.latitude, pos.coords.longitude]),
   null,
@@ -406,7 +382,7 @@ navigator.geolocation.watchPosition(
 
 /* Bouton centrer */
 const locateCtrl = L.control({ position: 'topleft' });
-locateCtrl.onAdd = function() {
+locateCtrl.onAdd = function () {
   const div = L.DomUtil.create('div', 'map-btn');
   div.innerHTML = "📍";
   div.title = "Ma position";
@@ -422,11 +398,10 @@ locateCtrl.onAdd = function() {
 };
 locateCtrl.addTo(map);
 
-/* ══ LÉGENDE INTERACTIVE ════════════════════════════════════════════ */
+/* ══ LÉGENDE INTERACTIVE ═════════════════════════════════════════════════ */
 const legendCtrl = L.control({ position: 'topleft' });
-legendCtrl.onAdd = function() {
+legendCtrl.onAdd = function () {
   const container = L.DomUtil.create('div', 'legend-container');
-
   const leg = document.createElement('div');
   leg.id = 'legend';
   leg.innerHTML = '<strong style="font-size:13px;display:block;margin-bottom:8px;">Filtres</strong>';
@@ -444,8 +419,7 @@ legendCtrl.onAdd = function() {
 
   L.DomEvent.disableClickPropagation(leg);
   L.DomEvent.on(leg, 'touchstart touchend mousedown mouseup', L.DomEvent.stopPropagation);
-
-  leg.addEventListener('change', (e) => {
+  leg.addEventListener('change', e => {
     if (e.target.classList.contains('legend-checkbox')) {
       const type = e.target.id.replace('filter-', '');
       filters[type] = e.target.checked;
@@ -477,8 +451,8 @@ function updateMarkersVisibility() {
   });
 }
 
-/* ══ PANNEAU BAS ════════════════════════════════════════════ */
-const panel  = document.getElementById("panel");
+/* ══ PANNEAU BAS ═════════════════════════════════════════════════════════ */
+const panel   = document.getElementById("panel");
 const content = document.getElementById("content");
 const handle  = document.getElementById("handle");
 
@@ -496,7 +470,6 @@ function openPanel(item) {
   const avis    = item["Avis"] || "";
   const date    = item["Date de la dernière visite"] || "";
   const comm    = item["Commentaires"] || "";
-
   const color    = COLORS[type] || COLORS["Autre"];
   const mapsHref = adresse ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adresse)}` : null;
   const telHref  = phone   ? `tel:${phone}` : null;
@@ -522,7 +495,7 @@ handle.addEventListener('touchmove', e => {
   if (e.touches[0].clientY - swipeY > 60) panel.classList.remove("open");
 }, { passive: true });
 
-/* ══ ICÔNES POI ════════════════════════════════════════════ */
+/* ══ ICÔNES POI ══════════════════════════════════════════════════════════ */
 function makePOIIcon(type) {
   const color = COLORS[type] || COLORS["Autre"];
   return L.divIcon({
@@ -533,7 +506,7 @@ function makePOIIcon(type) {
   });
 }
 
-/* ══ DONNÉES ════════════════════════════════════════════ */
+/* ══ DONNÉES ═════════════════════════════════════════════════════════════ */
 fetch(API_URL)
   .then(res => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -548,28 +521,24 @@ fetch(API_URL)
       const type  = item["Type de point d'intérêt"] || "Autre";
       const group = clusterGroups[type] || clusterGroups["Autre"];
 
-      const marker = L.marker([lat, lon], { icon: makePOIIcon(type) })
+      L.marker([lat, lon], { icon: makePOIIcon(type) })
         .bindPopup(`<b>${type}</b><br>${item["Adresse"] || ""}`)
-        .on('click', function(e) {
+        .on('click', function (e) {
           L.DomEvent.stopPropagation(e);
           openPanel(item);
-        });
-
-      group.addLayer(marker);
+        })
+        .addTo(group);
     });
-
-    Object.values(clusterGroups).forEach(group => map.addLayer(group));
+    Object.values(clusterGroups).forEach(g => map.addLayer(g));
   })
   .catch(err => {
     console.error("Erreur chargement :", err);
     content.innerHTML = `<p style="color:#c00;">⚠️ Impossible de charger les données.<br><small>${err.message}</small></p>`;
     panel.classList.add("open");
   })
-  .finally(() => {
-    document.getElementById('loader').classList.add('hidden');
-  });
+  .finally(() => document.getElementById('loader').classList.add('hidden'));
 
-/* ══ BOUTON "+" ET MIRE ═══════════════════════════════════════════════════ */
+/* ══ BOUTON "+" ET MIRE ══════════════════════════════════════════════════ */
 const addPointBtn        = document.getElementById('add-point-btn');
 const crosshairContainer = document.getElementById('crosshair-container');
 const coordsDisplay      = document.getElementById('coords-display');
@@ -589,24 +558,43 @@ addPointBtn.addEventListener('click', () => {
   map.on('move', updateCoords);
 });
 
-/* Géocodage inverse via Nominatim */
+/* ── Géocodage inverse Nominatim avec numéro de rue ── */
 async function reverseGeocode(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`;
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr&zoom=18&addressdetails=1`;
   try {
     const res  = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
     const data = await res.json();
+
+    if (!data.address) return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
+    const a = data.address;
+
+    // Reconstruction précise : numéro + rue + CP + ville
+    const numero = a.house_number || "";
+    const rue    = a.road || a.pedestrian || a.footway || a.path || "";
+    const cp     = a.postcode || "";
+    const ville  = a.city || a.town || a.village || a.hamlet || "";
+
+    if (rue) {
+      // Ex : "12 Rue de la Paix 75001 Paris"
+      return [numero, rue, cp, ville].filter(Boolean).join(" ").trim();
+    }
+
+    // Fallback sur display_name si pas de rue identifiable
     return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
   } catch {
     return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   }
 }
 
-/* Met à jour l'adresse affichée avec debounce 600 ms */
+/* ── Mise à jour de l'affichage avec debounce 600 ms ── */
 function updateCoords() {
   if (!crosshairContainer.classList.contains('active')) return;
 
   selectedLatLng = map.getCenter();
   coordsDisplay.textContent = "📍 Recherche de l'adresse…";
+  coordsDisplay.classList.add('loading');
   currentAddress = "";
 
   clearTimeout(geocodeTimer);
@@ -614,6 +602,7 @@ function updateCoords() {
     const { lat, lng } = selectedLatLng;
     currentAddress = await reverseGeocode(lat, lng);
     coordsDisplay.textContent = `📍 ${currentAddress}`;
+    coordsDisplay.classList.remove('loading');
   }, 600);
 }
 
@@ -642,11 +631,9 @@ validateBtn.addEventListener('click', () => {
 });
 
 /* ── Annuler : retour au mode explorateur ── */
-cancelBtn.addEventListener('click', () => {
-  resetCrosshair();
-});
+cancelBtn.addEventListener('click', resetCrosshair);
 
-/* Réinitialise le mode mire */
+/* ── Réinitialise le mode mire ── */
 function resetCrosshair() {
   crosshairContainer.classList.remove('active');
   validationPanel.style.display = 'none';
@@ -654,6 +641,7 @@ function resetCrosshair() {
   clearTimeout(geocodeTimer);
   selectedLatLng = null;
   currentAddress = "";
+  coordsDisplay.classList.remove('loading');
 }
 </script>
 </body>
