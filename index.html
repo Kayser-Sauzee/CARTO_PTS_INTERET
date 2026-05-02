@@ -208,7 +208,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   height: 100%;
   display: none;
   z-index: 2000;
-  pointer-events: none;
+  pointer-events: none; /* La mire elle-même ne bloque pas la carte */
 }
 #crosshair-container.active {
   display: block;
@@ -253,6 +253,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
   pointer-events: none;
   font-family: monospace;
 }
+
+/* ── FIX CRITIQUE : le panneau de validation doit recevoir les clics ── */
 #validation-panel {
   position: fixed;
   bottom: 20px;
@@ -262,7 +264,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
   padding: 12px 20px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 2001;
+  z-index: 2002;          /* au-dessus du crosshair-container */
+  pointer-events: auto;   /* ← réactive les clics malgré le parent */
   display: none;
   gap: 10px;
 }
@@ -270,10 +273,15 @@ body { margin: 0; font-family: Arial, sans-serif; }
   padding: 8px 16px;
   border: none;
   border-radius: 6px;
-  cursor: pointer; /* Curseur corrigé */
+  cursor: pointer;
   font-size: 14px;
   font-weight: bold;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.1s;
+  pointer-events: auto;   /* sécurité supplémentaire */
+}
+#validation-panel button:hover {
+  cursor: pointer;         /* curseur main au survol */
+  transform: scale(1.04);
 }
 #validation-panel #validate-btn {
   background: #3266ad;
@@ -322,10 +330,12 @@ body { margin: 0; font-family: Arial, sans-serif; }
 <div id="crosshair-container">
   <div id="crosshair"></div>
   <div id="coords-display">Lat: 0.000000, Lng: 0.000000</div>
-  <div id="validation-panel">
-    <button id="validate-btn">Valider</button>
-    <button id="cancel-btn">Annuler</button>
-  </div>
+</div>
+
+<!-- Panneau Valider / Annuler : HORS du crosshair-container pour éviter pointer-events:none -->
+<div id="validation-panel" style="display:none; flex-direction:row;">
+  <button id="validate-btn">✅ Valider</button>
+  <button id="cancel-btn">✖ Annuler</button>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -559,62 +569,65 @@ fetch(API_URL)
   });
 
 /* ══ BOUTON "+" ET MIRE ═══════════════════════════════════════════════════ */
-const addPointBtn = document.getElementById('add-point-btn');
+const addPointBtn  = document.getElementById('add-point-btn');
 const crosshairContainer = document.getElementById('crosshair-container');
-const coordsDisplay = document.getElementById('coords-display');
-const validationPanel = document.getElementById('validation-panel');
-const validateBtn = document.getElementById('validate-btn');
-const cancelBtn = document.getElementById('cancel-btn');
+const coordsDisplay      = document.getElementById('coords-display');
+const validationPanel    = document.getElementById('validation-panel');
+const validateBtn        = document.getElementById('validate-btn');
+const cancelBtn          = document.getElementById('cancel-btn');
 
 let selectedLatLng = null;
 
-// Afficher la mire et activer le suivi des coordonnées
+/* Ouvre le mode mire */
 addPointBtn.addEventListener('click', () => {
   crosshairContainer.classList.add('active');
   validationPanel.style.display = 'flex';
-  updateCoords(); // Mettre à jour les coordonnées immédiatement
-
-  // Mettre à jour les coordonnées à chaque mouvement de la carte
+  updateCoords();
   map.on('move', updateCoords);
 });
 
-// Mettre à jour les coordonnées affichées (centre de la carte = position de la mire)
+/* Met à jour les coordonnées affichées */
 function updateCoords() {
   if (!crosshairContainer.classList.contains('active')) return;
-
-  selectedLatLng = map.getCenter(); // Coordonnées du centre de la carte
-  coordsDisplay.textContent = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
+  selectedLatLng = map.getCenter();
+  coordsDisplay.textContent =
+    `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
 }
 
-// Valider les coordonnées et ouvrir le Google Form
+/* ── Valider : copie coords + ouvre le formulaire ── */
 validateBtn.addEventListener('click', () => {
   if (!selectedLatLng) {
-    alert("Veuillez sélectionner un point sur la carte.");
+    alert("Veuillez d'abord déplacer la carte pour centrer la mire.");
     return;
   }
 
-  // Copier les coordonnées dans le presse-papiers
-  const coordsText = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
+  const coordsText =
+    `${selectedLatLng.lat.toFixed(6)}, ${selectedLatLng.lng.toFixed(6)}`;
+
+  /* Copie dans le presse-papiers, puis ouvre le formulaire */
   navigator.clipboard.writeText(coordsText)
     .then(() => {
-      // Ouvrir le Google Form dans un nouvel onglet
+      alert(`✅ Coordonnées copiées :\n${coordsText}\n\nCollez-les dans le formulaire qui va s'ouvrir.`);
       window.open(FORM_URL, '_blank');
       resetCrosshair();
     })
     .catch(() => {
-      // Si la copie échoue, afficher les coordonnées à copier manuellement
-      alert(`Coordonnées à copier manuellement : ${coordsText}`);
+      /* Fallback si clipboard refusé (http ou permissions) */
+      prompt(
+        "Copiez ces coordonnées (Ctrl+C / Cmd+C) puis collez-les dans le formulaire :",
+        coordsText
+      );
       window.open(FORM_URL, '_blank');
       resetCrosshair();
     });
 });
 
-// Annuler
+/* ── Annuler : retour au mode explorateur ── */
 cancelBtn.addEventListener('click', () => {
   resetCrosshair();
 });
 
-// Réinitialiser la mire
+/* Réinitialise complètement le mode mire */
 function resetCrosshair() {
   crosshairContainer.classList.remove('active');
   validationPanel.style.display = 'none';
