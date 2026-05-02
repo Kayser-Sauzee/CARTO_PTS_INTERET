@@ -251,6 +251,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   z-index: 2001;
   pointer-events: none;
+  font-family: monospace;
 }
 #validation-panel {
   position: fixed;
@@ -262,7 +263,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   z-index: 2001;
-  display: flex;
+  display: none;
   gap: 10px;
 }
 #validation-panel button {
@@ -313,7 +314,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
 <!-- Mire (crosshair) et coordonnées -->
 <div id="crosshair-container">
   <div id="crosshair"></div>
-  <div id="coords-display">Lat: 0.0000, Lng: 0.0000</div>
+  <div id="coords-display">Lat: 0.000000, Lng: 0.000000</div>
   <div id="validation-panel">
     <button id="validate-btn">Valider</button>
     <button id="cancel-btn">Annuler</button>
@@ -423,7 +424,7 @@ legendCtrl.onAdd = function() {
   });
 
   L.DomEvent.disableClickPropagation(leg);
-  L.DomEvent.on(leg, 'touchstart touchend touchmove mousedown mouseup', L.DomEvent.stopPropagation);
+  L.DomEvent.on(leg, 'touchstart touchend mousedown mouseup', L.DomEvent.stopPropagation);
 
   leg.addEventListener('change', (e) => {
     if (e.target.classList.contains('legend-checkbox')) {
@@ -560,26 +561,43 @@ const cancelBtn = document.getElementById('cancel-btn');
 
 let selectedLatLng = null;
 
-// Afficher la mire et les coordonnées
+// Afficher la mire et activer le suivi des coordonnées
 addPointBtn.addEventListener('click', () => {
   crosshairContainer.classList.add('active');
-  map.once('click', (e) => {
-    selectedLatLng = e.latlng;
-    coordsDisplay.textContent = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
-    validationPanel.style.display = 'flex';
-  });
+  validationPanel.style.display = 'flex';
+
+  // Mettre à jour les coordonnées en temps réel
+  map.on('mousemove', updateCoords);
+  map.on('click', updateCoords);
 });
 
-// Valider les coordonnées
+// Mettre à jour les coordonnées affichées
+function updateCoords(e) {
+  if (!crosshairContainer.classList.contains('active')) return;
+
+  selectedLatLng = e.latlng;
+  coordsDisplay.textContent = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
+}
+
+// Valider les coordonnées et ouvrir le Google Form
 validateBtn.addEventListener('click', async () => {
-  if (!selectedLatLng) return;
+  if (!selectedLatLng) {
+    alert("Veuillez sélectionner un point sur la carte.");
+    return;
+  }
 
   try {
-    await navigator.clipboard.writeText(`Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`);
-    alert('Coordonnées copiées dans le presse-papiers ! Vous pouvez les coller dans votre Google Form.');
+    // Copier les coordonnées dans le presse-papiers
+    const coordsText = `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
+    await navigator.clipboard.writeText(coordsText);
+
+    // Ouvrir le Google Form
+    window.open(FORM_URL, '_blank');
+
+    // Réinitialiser
     resetCrosshair();
   } catch (e) {
-    alert('Erreur lors de la copie dans le presse-papiers. Veuillez copier manuellement : ' + coordsDisplay.textContent);
+    alert(`Erreur lors de la copie dans le presse-papiers. Veuillez copier manuellement : ${coordsDisplay.textContent}`);
     resetCrosshair();
   }
 });
@@ -591,6 +609,8 @@ cancelBtn.addEventListener('click', resetCrosshair);
 function resetCrosshair() {
   crosshairContainer.classList.remove('active');
   validationPanel.style.display = 'none';
+  map.off('mousemove', updateCoords);
+  map.off('click', updateCoords);
   selectedLatLng = null;
 }
 </script>
