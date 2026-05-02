@@ -610,7 +610,9 @@ validateBtn.addEventListener('click', () => {
 });
 
 // Annuler
-cancelBtn.addEventListener('click', resetCrosshair);
+cancelBtn.addEventListener('click', () => {
+  resetCrosshair();
+});
 
 // Réinitialiser la mire
 function resetCrosshair() {
