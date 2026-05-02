@@ -199,7 +199,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   transform: scale(1.05);
 }
 
-/* ── Mire (crosshair) et coordonnées ── */
+/* ── Mire (crosshair) et adresse ── */
 #crosshair-container {
   position: fixed;
   top: 0;
@@ -208,7 +208,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   height: 100%;
   display: none;
   z-index: 2000;
-  pointer-events: none; /* La mire elle-même ne bloque pas la carte */
+  pointer-events: none;
 }
 #crosshair-container.active {
   display: block;
@@ -244,17 +244,20 @@ body { margin: 0; font-family: Arial, sans-serif; }
   bottom: 100px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 10px 16px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   z-index: 2001;
   pointer-events: none;
-  font-family: monospace;
+  font-family: Arial, sans-serif;
+  max-width: 85vw;
+  text-align: center;
+  line-height: 1.4;
 }
 
-/* ── FIX CRITIQUE : le panneau de validation doit recevoir les clics ── */
+/* ── Panneau Valider / Annuler (HORS crosshair-container) ── */
 #validation-panel {
   position: fixed;
   bottom: 20px;
@@ -264,8 +267,8 @@ body { margin: 0; font-family: Arial, sans-serif; }
   padding: 12px 20px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  z-index: 2002;          /* au-dessus du crosshair-container */
-  pointer-events: auto;   /* ← réactive les clics malgré le parent */
+  z-index: 2002;
+  pointer-events: auto;
   display: none;
   gap: 10px;
 }
@@ -277,10 +280,10 @@ body { margin: 0; font-family: Arial, sans-serif; }
   font-size: 14px;
   font-weight: bold;
   transition: background 0.2s, transform 0.1s;
-  pointer-events: auto;   /* sécurité supplémentaire */
+  pointer-events: auto;
 }
 #validation-panel button:hover {
-  cursor: pointer;         /* curseur main au survol */
+  cursor: pointer;
   transform: scale(1.04);
 }
 #validation-panel #validate-btn {
@@ -298,7 +301,7 @@ body { margin: 0; font-family: Arial, sans-serif; }
   background: #e0e0e0;
 }
 
-/* Adaptation pour mobile */
+/* Adaptation mobile */
 @media (max-width: 768px) {
   #legend {
     max-height: 50vh;
@@ -326,13 +329,13 @@ body { margin: 0; font-family: Arial, sans-serif; }
 <!-- Bouton "+" pour ajouter un point -->
 <button id="add-point-btn">+</button>
 
-<!-- Mire (crosshair) et coordonnées -->
+<!-- Mire (crosshair) et adresse — pointer-events:none sur le container -->
 <div id="crosshair-container">
   <div id="crosshair"></div>
-  <div id="coords-display">Lat: 0.000000, Lng: 0.000000</div>
+  <div id="coords-display">📍 Recherche de l'adresse…</div>
 </div>
 
-<!-- Panneau Valider / Annuler : HORS du crosshair-container pour éviter pointer-events:none -->
+<!-- Panneau Valider/Annuler HORS du crosshair-container pour recevoir les clics -->
 <div id="validation-panel" style="display:none; flex-direction:row;">
   <button id="validate-btn">✅ Valider</button>
   <button id="cancel-btn">✖ Annuler</button>
@@ -343,17 +346,17 @@ body { margin: 0; font-family: Arial, sans-serif; }
 
 <script>
 /* ══ CONFIG ════════════════════════════════════════════ */
-const API_URL = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
+const API_URL  = "https://script.google.com/macros/s/AKfycbwftOih95jjdQRT3if2z9Tkowm2gJQxZa8ZdwVK-Acc1TOReFEnO9fn8V-CD3rglSzT1w/exec";
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfEX_UE8x8YAh7RypfVLBaZdMAH_u85SIJFnJKfZ3tSc_bpxw/viewform";
 
 const COLORS = {
-  "Hôtel": "#3266ad",
-  "CEREMA": "#e03232",
-  "CEI": "#2a9a4a",
-  "CER": "#e07c20",
+  "Hôtel":         "#3266ad",
+  "CEREMA":        "#e03232",
+  "CEI":           "#2a9a4a",
+  "CER":           "#e07c20",
   "Parking autre": "#7e57c2",
-  "Restaurant": "#795548",
-  "Autre": "#757575"
+  "Restaurant":    "#795548",
+  "Autre":         "#757575"
 };
 
 /* ══ CARTE ════════════════════════════════════════════ */
@@ -369,7 +372,6 @@ Object.keys(COLORS).forEach(type => {
   clusterGroups[type] = L.markerClusterGroup({ chunkedLoading: true });
 });
 
-/* État des filtres */
 const filters = {};
 Object.keys(COLORS).forEach(key => filters[key] = true);
 
@@ -465,7 +467,6 @@ legendCtrl.onAdd = function() {
 };
 legendCtrl.addTo(map);
 
-/* Met à jour la visibilité des clusters par type */
 function updateMarkersVisibility() {
   Object.entries(clusterGroups).forEach(([type, group]) => {
     if (filters[type]) {
@@ -477,9 +478,9 @@ function updateMarkersVisibility() {
 }
 
 /* ══ PANNEAU BAS ════════════════════════════════════════════ */
-const panel = document.getElementById("panel");
+const panel  = document.getElementById("panel");
 const content = document.getElementById("content");
-const handle = document.getElementById("handle");
+const handle  = document.getElementById("handle");
 
 function fieldHtml(icon, value, href) {
   if (!value || String(value).trim() === "" || value === "undefined" || value === "null") return "";
@@ -488,17 +489,17 @@ function fieldHtml(icon, value, href) {
 }
 
 function openPanel(item) {
-  const type = item["Type de point d'intérêt"] || "Point d'intérêt";
+  const type    = item["Type de point d'intérêt"] || "Point d'intérêt";
   const adresse = item["Adresse"] || "";
   const contact = item["Contact(s)"] || "";
-  const phone = item["Téléphone(s)"] || "";
-  const avis = item["Avis"] || "";
-  const date = item["Date de la dernière visite"] || "";
-  const comm = item["Commentaires"] || "";
+  const phone   = item["Téléphone(s)"] || "";
+  const avis    = item["Avis"] || "";
+  const date    = item["Date de la dernière visite"] || "";
+  const comm    = item["Commentaires"] || "";
 
-  const color = COLORS[type] || COLORS["Autre"];
+  const color    = COLORS[type] || COLORS["Autre"];
   const mapsHref = adresse ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adresse)}` : null;
-  const telHref = phone ? `tel:${phone}` : null;
+  const telHref  = phone   ? `tel:${phone}` : null;
 
   content.innerHTML = `
     <h3>${type}</h3>
@@ -544,7 +545,7 @@ fetch(API_URL)
       const lon = parseFloat(item["Longitude"]);
       if (isNaN(lat) || isNaN(lon)) return;
 
-      const type = item["Type de point d'intérêt"] || "Autre";
+      const type  = item["Type de point d'intérêt"] || "Autre";
       const group = clusterGroups[type] || clusterGroups["Autre"];
 
       const marker = L.marker([lat, lon], { icon: makePOIIcon(type) })
@@ -569,7 +570,7 @@ fetch(API_URL)
   });
 
 /* ══ BOUTON "+" ET MIRE ═══════════════════════════════════════════════════ */
-const addPointBtn  = document.getElementById('add-point-btn');
+const addPointBtn        = document.getElementById('add-point-btn');
 const crosshairContainer = document.getElementById('crosshair-container');
 const coordsDisplay      = document.getElementById('coords-display');
 const validationPanel    = document.getElementById('validation-panel');
@@ -577,6 +578,8 @@ const validateBtn        = document.getElementById('validate-btn');
 const cancelBtn          = document.getElementById('cancel-btn');
 
 let selectedLatLng = null;
+let currentAddress = "";
+let geocodeTimer   = null;
 
 /* Ouvre le mode mire */
 addPointBtn.addEventListener('click', () => {
@@ -586,37 +589,53 @@ addPointBtn.addEventListener('click', () => {
   map.on('move', updateCoords);
 });
 
-/* Met à jour les coordonnées affichées */
-function updateCoords() {
-  if (!crosshairContainer.classList.contains('active')) return;
-  selectedLatLng = map.getCenter();
-  coordsDisplay.textContent =
-    `Lat: ${selectedLatLng.lat.toFixed(6)}, Lng: ${selectedLatLng.lng.toFixed(6)}`;
+/* Géocodage inverse via Nominatim */
+async function reverseGeocode(lat, lng) {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`;
+  try {
+    const res  = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
+    const data = await res.json();
+    return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  } catch {
+    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
 }
 
-/* ── Valider : copie coords + ouvre le formulaire ── */
+/* Met à jour l'adresse affichée avec debounce 600 ms */
+function updateCoords() {
+  if (!crosshairContainer.classList.contains('active')) return;
+
+  selectedLatLng = map.getCenter();
+  coordsDisplay.textContent = "📍 Recherche de l'adresse…";
+  currentAddress = "";
+
+  clearTimeout(geocodeTimer);
+  geocodeTimer = setTimeout(async () => {
+    const { lat, lng } = selectedLatLng;
+    currentAddress = await reverseGeocode(lat, lng);
+    coordsDisplay.textContent = `📍 ${currentAddress}`;
+  }, 600);
+}
+
+/* ── Valider : copie l'adresse + ouvre le formulaire ── */
 validateBtn.addEventListener('click', () => {
   if (!selectedLatLng) {
-    alert("Veuillez d'abord déplacer la carte pour centrer la mire.");
+    alert("Veuillez déplacer la carte pour centrer la mire.");
+    return;
+  }
+  if (!currentAddress) {
+    alert("L'adresse est en cours de recherche, réessayez dans un instant.");
     return;
   }
 
-  const coordsText =
-    `${selectedLatLng.lat.toFixed(6)}, ${selectedLatLng.lng.toFixed(6)}`;
-
-  /* Copie dans le presse-papiers, puis ouvre le formulaire */
-  navigator.clipboard.writeText(coordsText)
+  navigator.clipboard.writeText(currentAddress)
     .then(() => {
-      alert(`✅ Coordonnées copiées :\n${coordsText}\n\nCollez-les dans le formulaire qui va s'ouvrir.`);
+      alert(`✅ Adresse copiée :\n${currentAddress}\n\nCollez-la dans le formulaire qui va s'ouvrir.`);
       window.open(FORM_URL, '_blank');
       resetCrosshair();
     })
     .catch(() => {
-      /* Fallback si clipboard refusé (http ou permissions) */
-      prompt(
-        "Copiez ces coordonnées (Ctrl+C / Cmd+C) puis collez-les dans le formulaire :",
-        coordsText
-      );
+      prompt("Copiez cette adresse puis collez-la dans le formulaire :", currentAddress);
       window.open(FORM_URL, '_blank');
       resetCrosshair();
     });
@@ -627,12 +646,14 @@ cancelBtn.addEventListener('click', () => {
   resetCrosshair();
 });
 
-/* Réinitialise complètement le mode mire */
+/* Réinitialise le mode mire */
 function resetCrosshair() {
   crosshairContainer.classList.remove('active');
   validationPanel.style.display = 'none';
   map.off('move', updateCoords);
+  clearTimeout(geocodeTimer);
   selectedLatLng = null;
+  currentAddress = "";
 }
 </script>
 </body>
